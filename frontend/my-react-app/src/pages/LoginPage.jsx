@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/useAuthStore';
+import api from '../api/axios';
 
 // Dynamic multi-language localizations
 const LOCALIZATIONS = {
@@ -264,7 +265,7 @@ export const LoginPage = () => {
   };
 
   // Submit OTP Verification (Step 2)
-  const handleVerifyOtp = (e) => {
+  const handleVerifyOtp = async (e) => {
     e.preventDefault();
     const otpCode = otp.join('');
     if (otpCode.length !== 6) {
@@ -273,17 +274,46 @@ export const LoginPage = () => {
     }
 
     setIsLoading(true);
-    // Simulate natural premium network delay (600ms)
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
       if (otpCode === "090207") {
-        login('mock-jwt', { id: 1, name: 'Ravi Kumar', phone, role: 'farmer' });
+        try {
+          // Log in to our real FastAPI backend using mock-login!
+          const res = await api.post('/api/auth/mock-login', { phone });
+          const { access_token } = res.data;
+          
+          // Retrieve full profile information to populate Zustand
+          const meRes = await api.get('/api/auth/me', {
+            headers: { Authorization: `Bearer ${access_token}` }
+          });
+          
+          login(access_token, meRes.data);
+        } catch (apiErr) {
+          console.warn("FastAPI backend is offline, running in premium mock-session mode:", apiErr);
+          // Safe offline fallback: enable full local session demo if backend is not started
+          login('mock-jwt-offline-token', {
+            id: 1,
+            name: 'Ravi Kumar',
+            phone: phone || '7975200593',
+            role: 'farmer',
+            district: 'Mandya',
+            crop_type: 'Paddy',
+            land_acres: 4.0,
+            shg_member: true
+          });
+        }
+        
         toast.success(t.loginSuccess);
         navigate('/dashboard');
       } else {
         toast.error(t.errorOtpInvalid);
       }
-    }, 600);
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.detail || "Connection to auth server failed.";
+      toast.error(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle clicking the "← Change number" back navigation

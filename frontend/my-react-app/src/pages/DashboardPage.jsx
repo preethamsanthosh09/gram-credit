@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useAuthStore } from '../store/useAuthStore';
 import toast from 'react-hot-toast';
+import api from '../api/axios';
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
@@ -10,20 +11,65 @@ export const DashboardPage = () => {
   const [loanAmount, setLoanAmount] = useState('');
   const [loanPurpose, setLoanPurpose] = useState('seeds');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeLoans, setActiveLoans] = useState([]);
+  const [maxAmount, setMaxAmount] = useState(75000);
 
-  const [activeLoans, setActiveLoans] = useState([
-    { id: 'LN-9082', amount: 45000, purpose: 'Tractor Maintenance', status: 'Disbursed', date: 'May 12, 2026' },
-    { id: 'LN-7612', amount: 15000, purpose: 'Organic Fertilizer', status: 'Paid', date: 'April 02, 2026' }
-  ]);
+  // Fetch live dashboard data from FastAPI
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchDashboardData = async () => {
+      try {
+        // Retrieve dynamic loans list
+        const loansRes = await api.get(`/api/loans?user_id=${user.id}`);
+        const formattedLoans = loansRes.data.map(loan => {
+          const dateObj = new Date(loan.created_at);
+          const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+          
+          let statusText = "Pending Approval";
+          if (loan.status === "approved") statusText = "Disbursed";
+          else if (loan.status === "rejected") statusText = "Rejected";
+          else if (loan.status === "paid") statusText = "Paid";
+          
+          return {
+            id: `LN-${loan.id}`,
+            amount: loan.amount,
+            purpose: `${loan.crop_type} Purchase`,
+            status: statusText,
+            date: formattedDate
+          };
+        });
+        setActiveLoans(formattedLoans);
+        
+        // Retrieve dynamic credit score threshold
+        const scoreRes = await api.get(`/api/auth/credit-score?user_id=${user.id}`);
+        const maxAmt = scoreRes.data?.max_amount !== undefined ? scoreRes.data.max_amount : 75000;
+        setMaxAmount(maxAmt);
+      } catch (err) {
+        console.error("FastAPI dashboard request failed, using demo fallback data:", err);
+        setActiveLoans([
+          { id: 'LN-9082', amount: 45000, purpose: 'Tractor Maintenance', status: 'Disbursed', date: 'May 12, 2026' },
+          { id: 'LN-7612', amount: 15000, purpose: 'Organic Fertilizer', status: 'Paid', date: 'April 02, 2026' }
+        ]);
+      }
+    };
+    
+    fetchDashboardData();
+  }, [user]);
+
+  // Compute stats on-the-fly from live data
+  const totalActiveCredit = activeLoans
+    .filter(l => l.status === 'Disbursed' || l.status === 'Pending Approval')
+    .reduce((sum, l) => sum + l.amount, 0);
 
   const stats = [
-    { title: 'Total Active Credit', value: '₹45,000', subtitle: '1 active loan', color: 'text-green-600' },
-    { title: 'Approved Limit', value: '₹1,500,000', subtitle: 'Based on land holding', color: 'text-emerald-600' },
-    { title: 'Next Payment Due', value: '₹3,750', subtitle: 'Due on June 15, 2026', color: 'text-amber-600' },
-    { title: 'Registered Acreage', value: '6.4 Acres', subtitle: 'Verified via Bhoomi API', color: 'text-blue-600' }
+    { title: 'Total Active Credit', value: `₹${totalActiveCredit.toLocaleString()}`, subtitle: `${activeLoans.filter(l => l.status === 'Disbursed').length} active loan(s)`, color: 'text-green-600' },
+    { title: 'Approved Limit', value: `₹${maxAmount.toLocaleString()}`, subtitle: 'Based on land holding', color: 'text-emerald-600' },
+    { title: 'Next Payment Due', value: totalActiveCredit > 0 ? `₹${Math.round(totalActiveCredit * 0.08 / 12 + totalActiveCredit / 12).toLocaleString()}` : '₹0', subtitle: 'Calculated post-harvest', color: 'text-amber-600' },
+    { title: 'Registered Acreage', value: user?.land_acres ? `${user.land_acres} Acres` : '6.4 Acres', subtitle: 'Verified via Bhoomi API', color: 'text-blue-600' }
   ];
 
-  const handleApplyLoan = (e) => {
+  const handleApplyLoan = async (e) => {
     e.preventDefault();
     const amount = parseFloat(loanAmount);
     if (!amount || amount <= 0) {
@@ -32,19 +78,48 @@ export const DashboardPage = () => {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const newLoan = {
-        id: `LN-${Math.floor(1000 + Math.random() * 9000)}`,
-        amount,
-        purpose: loanPurpose.charAt(0).toUpperCase() + loanPurpose.slice(1) + ' Purchase',
-        status: 'Pending Approval',
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+    try {
+      const payload = {
+        user_id: user.id,
+        crop_type: user.crop_type || "Paddy",
+        land_acres: user.land_acres || 4.0,
+        shg_member: user.shg_member || true,
+        amount: amount,
+        repayment_mode: "harvest",
+        district: user.district || "Mandya"
       };
-      setActiveLoans([newLoan, ...activeLoans]);
-      setLoanAmount('');
+      
+      await api.post('/api/loans/apply', payload);
       toast.success('Credit Application submitted successfully!');
-    }, 800);
+      
+      // Refresh dynamic statements list instantly
+      const loansRes = await api.get(`/api/loans?user_id=${user.id}`);
+      const formattedLoans = loansRes.data.map(loan => {
+        const dateObj = new Date(loan.created_at);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        
+        let statusText = "Pending Approval";
+        if (loan.status === "approved") statusText = "Disbursed";
+        else if (loan.status === "rejected") statusText = "Rejected";
+        else if (loan.status === "paid") statusText = "Paid";
+        
+        return {
+          id: `LN-${loan.id}`,
+          amount: loan.amount,
+          purpose: `${loan.crop_type} Purchase`,
+          status: statusText,
+          date: formattedDate
+        };
+      });
+      setActiveLoans(formattedLoans);
+      setLoanAmount('');
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.detail || "Submission to cooperative registry failed.";
+      toast.error(errMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

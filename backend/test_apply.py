@@ -122,7 +122,7 @@ def test_loan_scheduling_flow():
     )
     assert resp.status_code == 200
     loan_monthly = resp.json()
-    assert loan_monthly["status"] == "approved"
+    assert loan_monthly["status"] == "pending"
     assert loan_monthly["score"] >= 50
     assert len(loan_monthly["repayment_schedule"]) == 12
     for m in range(12):

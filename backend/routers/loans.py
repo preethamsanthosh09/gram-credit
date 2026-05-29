@@ -25,6 +25,10 @@ class EligibilityRequest(BaseModel):
     user_id: int
     existing_loans: int = 0
     repayment_history: int = 0
+    crop_type: Optional[str] = None
+    land_acres: Optional[float] = None
+    shg_member: Optional[bool] = None
+    district: Optional[str] = None
 
 class ScoreBreakdown(BaseModel):
     docs: int
@@ -91,7 +95,7 @@ class LoanDetailResponse(BaseModel):
 class LoanListResponse(BaseModel):
     id: int
     user_id: int
-    farmer_name: str
+    farmer_name: Optional[str] = "Farmer"
     crop_type: str
     land_acres: float
     shg_member: bool
@@ -132,13 +136,18 @@ def check_loan_eligibility(request: EligibilityRequest, db: Session = Depends(ge
         
     docs_count = db.query(Document).filter(Document.user_id == request.user_id).count()
     
+    crop = request.crop_type if request.crop_type is not None else user.crop_type
+    land_acres = request.land_acres if request.land_acres is not None else user.land_acres
+    shg_member = request.shg_member if request.shg_member is not None else user.shg_member
+    district = request.district if request.district is not None else user.district
+    
     eligibility_result = calculate_score(
-        crop=user.crop_type,
-        land_acres=user.land_acres,
-        shg_member=user.shg_member,
+        crop=crop,
+        land_acres=land_acres,
+        shg_member=shg_member,
         docs_count=docs_count,
         existing_loans=request.existing_loans,
-        district=user.district,
+        district=district,
         repayment_history=request.repayment_history
     )
     

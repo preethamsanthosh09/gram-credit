@@ -66,9 +66,11 @@ class NextMilestone(BaseModel):
 class CreditScoreResponse(BaseModel):
     score: int
     tier: str
+    max_amount: int
     history: List[CreditScoreHistoryItem]
     next_milestone: NextMilestone
     how_to_improve: List[str]
+
 
 class ScoreUpdateRequest(BaseModel):
     user_id: int
@@ -198,12 +200,16 @@ def get_credit_score(user_id: int, db: Session = Depends(get_db)):
     
     if score >= 90:
         tier = "Premium"
+        max_amount = 150000
     elif score >= 70:
         tier = "Standard"
+        max_amount = 75000
     elif score >= 50:
         tier = "Basic"
+        max_amount = 40000
     else:
         tier = "Subprime"
+        max_amount = 15000
         
     history = [
         {"month": "Jan", "score": max(score - 28, 30)},
@@ -226,10 +232,12 @@ def get_credit_score(user_id: int, db: Session = Depends(get_db)):
     return {
         "score": score,
         "tier": tier,
+        "max_amount": max_amount,
         "history": history,
         "next_milestone": next_milestone,
         "how_to_improve": how_to_improve
     }
+
 
 
 @router.post("/credit-score/update", response_model=ScoreUpdateResponse)

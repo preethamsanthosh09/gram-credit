@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
 import { useAuthStore } from '../store/useAuthStore';
+import api from '../api/axios';
 import {
   ResponsiveContainer,
   BarChart,
@@ -28,7 +29,7 @@ const CustomTooltip = ({ active, payload }) => {
 export const ProfilePage = () => {
   const { user } = useAuthStore();
   
-  // Local profile state initialized with current session details or mock data
+  // Local profile state initialized with session values
   const [profile, setProfile] = useState({
     name: user?.name || 'Ravi Kumar',
     phone: user?.phone || '7975200593',
@@ -39,24 +40,48 @@ export const ProfilePage = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [score, setScore] = useState(78);
+  const [historyData, setHistoryData] = useState([
+    { month: 'Jan', score: 50 },
+    { month: 'Feb', score: 60 },
+    { month: 'Mar', score: 70 },
+    { month: 'Apr', score: 78 }
+  ]);
 
-  // Score stats
-  const score = 78;
   const targetScore = 85;
-  const pointsNeeded = targetScore - score;
+  const pointsNeeded = Math.max(0, targetScore - score);
   
   // Circumference calculation for SVG circular ring: 2 * Math.PI * r (r = 50 => circumference = 314.159)
   const radius = 50;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (score / 100) * circumference;
 
-  // Recharts history data
-  const historyData = [
-    { month: 'Jan', score: 50 },
-    { month: 'Feb', score: 60 },
-    { month: 'Mar', score: 70 },
-    { month: 'Apr', score: 78 }
-  ];
+  // Retrieve dynamic profile details from FastAPI
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchProfileData = async () => {
+      try {
+        const meRes = await api.get('/api/auth/me');
+        setProfile({
+          name: meRes.data.name || 'Ravi Kumar',
+          phone: meRes.data.phone || '7975200593',
+          district: meRes.data.district || 'Mandya',
+          cropType: meRes.data.crop_type || 'Sugarcane',
+          landAcres: String(meRes.data.land_acres || '6.4'),
+          shgMember: meRes.data.shg_member !== undefined ? meRes.data.shg_member : true
+        });
+        
+        const scoreRes = await api.get(`/api/auth/credit-score?user_id=${user.id}`);
+        setScore(scoreRes.data.score);
+        setHistoryData(scoreRes.data.history);
+      } catch (err) {
+        console.error("FastAPI profile retrieval failed, showing dynamic fallback session details:", err);
+      }
+    };
+    
+    fetchProfileData();
+  }, [user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -73,7 +98,7 @@ export const ProfilePage = () => {
     }));
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
     if (!profile.name.trim()) {
       toast.error("Name cannot be empty.");
@@ -93,19 +118,33 @@ export const ProfilePage = () => {
     }
 
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      const res = await api.patch('/api/auth/profile', {
+        name: profile.name,
+        district: profile.district,
+        crop_type: profile.cropType,
+        land_acres: Number(profile.landAcres),
+        shg_member: profile.shgMember
+      });
       
-      // Update the Zustand global auth store dynamically so header & sidebar updates instantly!
+      // Update global Zustand state to reflect instantly in layout headers and sidebars
       useAuthStore.setState({
-        user: {
-          ...user,
-          name: profile.name
-        }
+        user: res.data
       });
 
+      // Recalculate live score dynamically
+      const scoreRes = await api.get(`/api/auth/credit-score?user_id=${user.id}`);
+      setScore(scoreRes.data.score);
+      setHistoryData(scoreRes.data.history);
+
       toast.success("Profile updated");
-    }, 800);
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.detail || "Update to cooperative registry failed.";
+      toast.error(errMsg);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

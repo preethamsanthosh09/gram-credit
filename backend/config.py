@@ -1,4 +1,10 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Force local SQLite database to prevent global Postgres env overrides from breaking local execution
+if "DATABASE_URL" in os.environ and not os.environ["DATABASE_URL"].startswith("sqlite"):
+    os.environ["DATABASE_URL"] = "sqlite:///./gramcredit.db"
+
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./gramcredit.db"

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import engine, Base, SessionLocal
-from routers import auth, kyc, loans, analytics, rosca, expenses, schemes
+from routers import auth, kyc, loans, analytics, rosca, expenses, schemes, chatbot
 from models.user import User
 from models.expense import Expense
 
@@ -85,6 +85,7 @@ app.include_router(analytics.router)
 app.include_router(rosca.router, prefix="/api/rosca", tags=["ROSCA"])
 app.include_router(expenses.router)
 app.include_router(schemes.router)
+app.include_router(chatbot.router)
 
 
 
@@ -92,13 +93,32 @@ app.include_router(schemes.router)
 
 
 
-@app.get("/")
-def read_root():
-    return {
-        "status": "healthy",
-        "service": "GramCredit API",
-        "docs": "/docs"
-    }
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
+import os
+
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "../frontend/my-react-app/dist"))
+
+if os.path.exists(frontend_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+    
+    @app.get("/{catchall:path}")
+    def serve_react_app(catchall: str):
+        if catchall.startswith(("api", "docs", "redoc", "openapi.json")):
+            raise HTTPException(status_code=404)
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"status": "healthy", "service": "GramCredit API"}
+else:
+    @app.get("/")
+    def read_root():
+        return {
+            "status": "healthy",
+            "service": "GramCredit API",
+            "docs": "/docs"
+        }
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

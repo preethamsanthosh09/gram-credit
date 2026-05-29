@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
+import api from '../api/axios';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const ROSCAPage = () => {
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('MyGroup');
 
   // Interactive My Group states
@@ -22,7 +25,25 @@ export const ROSCAPage = () => {
   const [contributionFee, setContributionFee] = useState(1000);
   const [isCreating, setIsCreating] = useState(false);
 
-  const handleBidSubmit = (e) => {
+  // Fetch rotating savings details from FastAPI
+  const fetchGroupDetails = async () => {
+    if (!user?.id) return;
+    try {
+      const res = await api.get(`/api/rosca/my-groups?user_id=${user.id}`);
+      setHighestBid(res.data.current_auction.current_bid);
+      setBidsCount(res.data.current_auction.bids_placed);
+      setTotalPaid(res.data.paid_months * res.data.monthly_contribution);
+      setHasPaidCurrent(res.data.paid_months >= res.data.current_month);
+    } catch (err) {
+      console.error("FastAPI ROSCA circle details failed, showing fallbacks:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchGroupDetails();
+  }, [user]);
+
+  const handleBidSubmit = async (e) => {
     e.preventDefault();
     const bidVal = Number(myBid);
     if (!bidVal || bidVal < 5000 || bidVal > 10000) {
@@ -35,26 +56,45 @@ export const ROSCAPage = () => {
       return;
     }
 
-    setHighestBid(bidVal);
-    setBidsCount(prev => prev + 1);
-    setHasBidded(true);
-    setIsBiddingOpen(false);
-    toast.success("Bid submitted!");
+    try {
+      await api.post('/api/rosca/bid', {
+        group_id: 1,
+        user_id: user?.id || 1,
+        amount: bidVal
+      });
+      setHighestBid(bidVal);
+      setBidsCount(prev => prev + 1);
+      setHasBidded(true);
+      setIsBiddingOpen(false);
+      toast.success("Bid submitted!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Bidding process failed on server.");
+    }
   };
 
-  const handlePayContribution = () => {
+  const handlePayContribution = async () => {
     setIsPaying(true);
     toast.loading("Connecting to UPI gateway...", { id: "payment-toast" });
 
-    setTimeout(() => {
+    try {
+      await api.post('/api/rosca/pay-contribution', {
+        group_id: 1,
+        user_id: user?.id || 1,
+        month: 3
+      });
       setIsPaying(false);
       setTotalPaid(prev => prev + 1000);
       setHasPaidCurrent(true);
       toast.success("₹1,000 Contribution Paid Successfully!", { id: "payment-toast" });
-    }, 1200);
+    } catch (err) {
+      console.error(err);
+      setIsPaying(false);
+      toast.error("UPI contribution gateway timeout.", { id: "payment-toast" });
+    }
   };
 
-  const handleCreateGroup = (e) => {
+  const handleCreateGroup = async (e) => {
     e.preventDefault();
     if (!newGroupName.trim()) {
       toast.error("Please enter a valid Group Name.");
@@ -62,14 +102,23 @@ export const ROSCAPage = () => {
     }
 
     setIsCreating(true);
-    setTimeout(() => {
-      setIsCreating(false);
-      toast.success(`${newGroupName} created! Invites sent via SMS.`);
-      // Reset creation form
+    try {
+      const res = await api.post('/api/rosca/create', {
+        name: newGroupName,
+        members_count: membersCount,
+        monthly_contribution: contributionFee,
+        created_by: user?.id || 1
+      });
+      toast.success(`${newGroupName} created! Invitation code is ${res.data.invite_code}. Invites sent via SMS.`);
       setNewGroupName('');
-      // Redirect back to My Group to view active circle!
       setActiveTab('MyGroup');
-    }, 1200);
+      fetchGroupDetails();
+    } catch (err) {
+      console.error(err);
+      toast.error("Cooperative group creation failed on server.");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (

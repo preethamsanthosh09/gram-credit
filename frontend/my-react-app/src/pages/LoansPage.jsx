@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
-import api from '../api/axios'; // Custom Axios instance with JWT interceptor
+import api from '../api/axios';
 
 export const LoansPage = () => {
   const navigate = useNavigate();
@@ -16,136 +16,116 @@ export const LoansPage = () => {
   // Decsisioning loader states
   const [isDecisioning, setIsDecisioning] = useState(false);
 
-  // Mock dataset containing 6 farmers
-  const [loans, setLoans] = useState([
-    {
-      id: "LN-9082",
-      name: "Ravi Kumar",
-      phone: "+91 7975200593",
-      crop: "Paddy",
-      district: "Mandya",
-      amount: 45000,
-      score: 84,
-      status: "Approved",
-      date: "May 12, 2026",
-      land: "6.4 Acres",
-      shg: "Yes (Mandya Farmers Co-op)",
-      interest: "8.5%",
-      avatar: "R"
-    },
-    {
-      id: "LN-3829",
-      name: "Lakshmi Devi",
-      phone: "+91 9845209812",
-      crop: "Wheat",
-      district: "Belagavi",
-      amount: 65000,
-      score: 78,
-      status: "Pending",
-      date: "May 25, 2026",
-      land: "4.2 Acres",
-      shg: "Yes (Kittur Mahila SHG)",
-      interest: "8.5%",
-      avatar: "L"
-    },
-    {
-      id: "LN-1029",
-      name: "Suresh Patil",
-      phone: "+91 8762410981",
-      crop: "Sugarcane",
-      district: "Bagalkot",
-      amount: 120000,
-      score: 92,
-      status: "Approved",
-      date: "May 08, 2026",
-      land: "8.0 Acres",
-      shg: "No",
-      interest: "8.5%",
-      avatar: "S"
-    },
-    {
-      id: "LN-4829",
-      name: "Meena Bai",
-      phone: "+91 7022510982",
-      crop: "Cotton",
-      district: "Raichur",
-      amount: 35000,
-      score: 62,
-      status: "Pending",
-      date: "May 28, 2026",
-      land: "3.5 Acres",
-      shg: "Yes (Raichur Cotton Weavers)",
-      interest: "11.5%",
-      avatar: "M"
-    },
-    {
-      id: "LN-8291",
-      name: "Gopal Reddy",
-      phone: "+91 9448301928",
-      crop: "Maize",
-      district: "Kolar",
-      amount: 20000,
-      score: 41,
-      status: "Rejected",
-      date: "May 18, 2026",
-      land: "2.1 Acres",
-      shg: "No",
-      interest: "15.0%",
-      avatar: "G"
-    },
-    {
-      id: "LN-7729",
-      name: "Anita Kumari",
-      phone: "+91 9901429810",
-      crop: "Paddy",
-      district: "Shimoga",
-      amount: 50000,
-      score: 74,
-      status: "Approved",
-      date: "May 20, 2026",
-      land: "5.0 Acres",
-      shg: "Yes (Shimoga Agro SHG)",
-      interest: "8.5%",
-      avatar: "A"
+  // Registry dynamic state
+  const [loans, setLoans] = useState([]);
+
+  // Fetch all loans from FastAPI
+  const fetchLoans = async () => {
+    try {
+      const res = await api.get('/api/loans');
+      const formatted = res.data.map(loan => {
+        const dateObj = new Date(loan.created_at);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        
+        let statusText = "Pending";
+        if (loan.status === "approved") statusText = "Approved";
+        else if (loan.status === "rejected") statusText = "Rejected";
+        else if (loan.status === "paid") statusText = "Paid";
+        
+        return {
+          id: `LN-${loan.id}`,
+          rawId: loan.id,
+          name: loan.farmer_name || "Demo Farmer",
+          phone: "+91 7975200593",
+          crop: loan.crop_type,
+          district: loan.district,
+          amount: loan.amount,
+          score: Math.round(loan.score),
+          status: statusText,
+          date: formattedDate,
+          land: `${loan.land_acres} Acres`,
+          shg: loan.shg_member ? "Yes" : "No",
+          interest: "8.5%",
+          avatar: (loan.farmer_name || "Demo Farmer").charAt(0)
+        };
+      });
+      setLoans(formatted);
+    } catch (err) {
+      console.error("Cooperative registry fetch failed, using fallback:", err);
+      setLoans([
+        {
+          id: "LN-9082",
+          rawId: 1,
+          name: "Ravi Kumar",
+          phone: "+91 7975200593",
+          crop: "Paddy",
+          district: "Mandya",
+          amount: 45000,
+          score: 84,
+          status: "Approved",
+          date: "May 12, 2026",
+          land: "6.4 Acres",
+          shg: "Yes (Mandya Farmers Co-op)",
+          interest: "8.5%",
+          avatar: "R"
+        },
+        {
+          id: "LN-3829",
+          rawId: 2,
+          name: "Lakshmi Devi",
+          phone: "+91 9845209812",
+          crop: "Wheat",
+          district: "Belagavi",
+          amount: 65000,
+          score: 78,
+          status: "Pending",
+          date: "May 25, 2026",
+          land: "4.2 Acres",
+          shg: "Yes (Kittur Mahila SHG)",
+          interest: "8.5%",
+          avatar: "L"
+        }
+      ]);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchLoans();
+  }, []);
 
   // Handle Approve (PATCH /api/loans/{id}/approve)
-  const handleApprove = async (id) => {
+  const handleApprove = async (id, rawId) => {
     setIsDecisioning(true);
     toast.loading("Uploading e-signature to registry...", { id: "decision-toast" });
 
     try {
-      await api.patch(`/api/loans/${id}/approve`);
-      // Update local state
+      const targetId = rawId || parseInt(id.replace("LN-", ""));
+      await api.patch(`/api/loans/${targetId}/approve`);
       updateLoanStatus(id, "Approved");
       toast.success("Approved! SMS sent.", { id: "decision-toast" });
-    } catch {
-      // Offline fallback
-      setTimeout(() => {
-        updateLoanStatus(id, "Approved");
-        setIsDecisioning(false);
-        toast.success("Approved! SMS sent.", { id: "decision-toast" });
-      }, 1000);
+    } catch (err) {
+      console.error(err);
+      toast.error("Cooperative approval failed.", { id: "decision-toast" });
+    } finally {
+      setIsDecisioning(false);
     }
   };
 
   // Handle Reject (PATCH /api/loans/{id}/reject)
-  const handleReject = async (id) => {
+  const handleReject = async (id, rawId) => {
     setIsDecisioning(true);
     toast.loading("Registering rejection deed...", { id: "decision-toast" });
 
     try {
-      await api.patch(`/api/loans/${id}/reject`);
+      const targetId = rawId || parseInt(id.replace("LN-", ""));
+      await api.patch(`/api/loans/${targetId}/reject`, { reason: "Did not clear cooperative credit thresholds" });
       updateLoanStatus(id, "Rejected");
       toast.error("Application Rejected.", { id: "decision-toast" });
-    } catch {
-      // Offline fallback
-      setTimeout(() => {
-        updateLoanStatus(id, "Rejected");
-        setIsDecisioning(false);
-        toast.error("Application Rejected.", { id: "decision-toast" });
-      }, 1000);
+    } catch (err) {
+      console.error(err);
+      toast.error("Cooperative rejection failed.", { id: "decision-toast" });
+    } finally {
+      setIsDecisioning(false);
     }
   };
 
@@ -383,14 +363,14 @@ export const LoansPage = () => {
               {selectedLoan.status === 'Pending' ? (
                 <div className="space-y-2.5">
                   <button
-                    onClick={() => handleApprove(selectedLoan.id)}
+                    onClick={() => handleApprove(selectedLoan.id, selectedLoan.rawId)}
                     disabled={isDecisioning}
                     className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl transition-all shadow-md shadow-green-600/10 flex items-center justify-center gap-1.5"
                   >
                     <span>✅ Approve Application</span>
                   </button>
                   <button
-                    onClick={() => handleReject(selectedLoan.id)}
+                    onClick={() => handleReject(selectedLoan.id, selectedLoan.rawId)}
                     disabled={isDecisioning}
                     className="w-full py-3 bg-red-50 hover:bg-red-100 border border-red-100 disabled:bg-gray-100 disabled:text-gray-300 disabled:border-gray-250 text-red-600 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5"
                   >
