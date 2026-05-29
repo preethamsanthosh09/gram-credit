@@ -7,7 +7,7 @@ import api from '../api/axios';
 // Dynamic multi-language localizations
 const LOCALIZATIONS = {
   EN: {
-    tagline: "Formal credit for farmers",
+    tagline: "Formal credit for Rural Peoples",
     phoneTitle: "Welcome to GramCredit",
     phoneSubtitle: "Enter your mobile number to receive a secure login OTP.",
     phoneLabel: "Mobile Number",

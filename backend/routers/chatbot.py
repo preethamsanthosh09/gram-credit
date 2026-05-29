@@ -60,29 +60,91 @@ def get_offline_response(message: str, lang: str) -> str:
         return responses["schemes"]
     return responses["default"]
 
+SYSTEM_PROMPT = """You are Saathi, the GramCredit financial assistant for rural Indian farmers.
+
+YOUR ROLE:
+- Help farmers understand loans, interest rates, repayment schedules
+- Explain government schemes (PM-Kisan, PMFBY, KCC, Soil Health Card)
+- Guide farmers through the loan application process
+- Explain the ROSCA/chit fund concept
+
+LANGUAGE RULE (most important):
+- Detect the language of the user's message
+- Reply in the EXACT same language
+- If user writes in Kannada, reply fully in Kannada
+- If user writes in Hindi, reply fully in Hindi
+- Never mix languages in a single response
+- For English: use simple words, avoid financial jargon
+
+KNOWLEDGE:
+- GramCredit interest rate: 12% per year (10% for SHG members)
+- Loan range: ₹1,000 to ₹1,50,000
+- Repayment: aligned to harvest season, no EMI during sowing
+- Paddy harvest: October-November
+- Wheat harvest: March-April
+- KYC: Aadhaar + ration card + land document
+- Credit score: starts at 50, grows with repayments (+10 per EMI), SHG (+20)
+
+TONE:
+- Warm, respectful, like talking to a trusted village elder
+- Use specific rupee amounts in examples
+- Keep sentences short — farmers may have limited literacy
+- Always end with an encouraging note
+
+NEVER:
+- Give advice outside of financial/farming topics
+- Share personal data
+- Recommend illegal money lenders"""
+
+
 @router.post("/message", response_model=ChatMessageResponse)
 async def get_chatbot_message(request: ChatMessageRequest):
     if settings.GEMINI_API_KEY:
+        # Try google-genai SDK first
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
-            prompt = (
-                f"You are Saathi (meaning friend), a friendly digital financial assistant for farmers using the GramCredit app. "
-                f"Provide helpful, warm, professional advice on crop credit, interest rates (8% to 15%), cooperative lending, "
-                f"repayment modes (monthly, harvest-aligned, yearly), and agricultural schemes in {request.language} language. "
-                f"Keep your reply under 3 short sentences, extremely simple for rural farmers to understand. "
-                f"Here is the user's message: '{request.message}'"
+            from google import genai
+            from google.genai import types
+            
+            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=request.message,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT
+                )
             )
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}]
-            }
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, timeout=10.0)
-                if response.status_code == 200:
-                    resp_json = response.json()
-                    text_content = resp_json["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    return {"reply": text_content}
-        except Exception as e:
-            print(f"[Chatbot] Gemini call failed: {e}. Falling back to offline responses.")
+            text_content = response.text.strip()
+            if text_content:
+                return {"reply": text_content}
+        except Exception as sdk_err:
+            print(f"[Chatbot] google-genai SDK call failed: {sdk_err}. Falling back to REST API.")
+            
+            # Direct REST HTTP call using gemini-2.0-flash and systemInstruction
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}"
+                payload = {
+                    "systemInstruction": {
+                        "parts": [
+                            {"text": SYSTEM_PROMPT}
+                        ]
+                    },
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": request.message}
+                            ]
+                        }
+                    ]
+                }
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(url, json=payload, timeout=12.0)
+                    if response.status_code == 200:
+                        resp_json = response.json()
+                        text_content = resp_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+                        return {"reply": text_content}
+            except Exception as http_err:
+                print(f"[Chatbot] REST call failed: {http_err}. Falling back to offline responses.")
             
     reply = get_offline_response(request.message, request.language)
     return {"reply": reply}

@@ -135,7 +135,7 @@ def test_kyc_flow():
     assert data["success"] is True
     assert data["doc_type"] == "land"
     assert data["extracted_data"]["survey_number"] == "KA-MND-045"
-    assert data["extracted_data"]["area_acres"] == "2.0"
+    assert data["extracted_data"]["area_acres"] == 2.0
     print("   [OK] Land record scanned successfully.")
 
     # 8. Test verify-all with 3 documents

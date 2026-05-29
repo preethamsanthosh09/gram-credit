@@ -1,5 +1,6 @@
 import re
 import json
+import base64
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -60,74 +61,102 @@ def clean_base64(image_base64_raw: str):
 
 # --- Gemini API scan helper ---
 def extract_data_from_image_ai(base64_data: str, mime_type: str, doc_type: str, api_key: str) -> dict:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    
     if doc_type == "aadhaar":
         prompt = (
-            "You are an AI document scanner. Analyze the provided Aadhaar Card image and extract the following details "
-            "exactly, and return them as a JSON object (without markdown code blocks, just raw JSON). "
-            "Fields to extract:\n"
-            "- name: the full name of the person (string)\n"
-            "- dob: date of birth in DD/MM/YYYY format (string)\n"
-            "- address: the address listed (string)\n"
-            "- aadhaar_last4: the last 4 digits of the Aadhaar number (string)\n"
+            "You are a KYC document scanner for GramCredit, a rural Indian fintech app. Extract data from this Aadhaar card image.\n\n"
+            "Return ONLY a JSON object. No explanation, no markdown, no backticks. Just raw JSON:\n"
+            '{"name": "full name as shown", "dob": "DD/MM/YYYY format", "address": "complete address", "aadhaar_last4": "last 4 digits only", "gender": "Male or Female"}\n\n'
+            "Rules:\n"
+            "- If a field is not clearly visible, return empty string for that field\n"
+            "- For address: include village, district, state, pin code if visible\n"
+            "- For name: use exactly as printed, respect regional scripts but transliterate to English\n"
+            "- aadhaar_last4: return ONLY the last 4 digits, never the full number"
         )
     elif doc_type == "ration":
         prompt = (
-            "You are an AI document scanner. Analyze the provided Ration Card image and extract the following details "
-            "exactly, and return them as a JSON object (without markdown code blocks, just raw JSON). "
-            "Fields to extract:\n"
-            "- name: the name of the head of family / card holder (string)\n"
-            "- address: the address listed (string)\n"
-            "- ration_number: the card number (string)\n"
-            "- family_members: the number of family members as a string (string, e.g., '4')\n"
+            "Extract from this ration card: return ONLY JSON with keys: name, address, ration_number, category (APL/BPL/AAY), family_members (number)"
         )
     elif doc_type == "land":
         prompt = (
-            "You are an AI document scanner. Analyze the provided Land Record document image and extract the following details "
-            "exactly, and return them as a JSON object (without markdown code blocks, just raw JSON). "
-            "Fields to extract:\n"
-            "- survey_number: the survey, khata, or land identification number (string)\n"
-            "- area_acres: the land area size in acres as a string (string, e.g., '2.5')\n"
-            "- district: district name (string)\n"
-            "- owner_name: the primary owner's name (string)\n"
+            "Extract from this land/property document: return ONLY JSON with keys: owner_name, survey_number, area_acres (number), district, taluk, village"
         )
     else:
         raise ValueError(f"Unsupported doc_type: {doc_type}")
+
+    # Try calling via the new google-genai SDK
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=api_key)
         
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt},
-                    {
-                        "inlineData": {
-                            "mimeType": mime_type,
-                            "data": base64_data
+        # Base64 decode to pass raw image bytes
+        image_bytes = base64.b64decode(base64_data)
+        
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                prompt,
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=mime_type
+                )
+            ]
+        )
+        text_content = response.text.strip()
+        
+        # Clean response if markdown code block is present
+        if text_content.startswith("```json"):
+            text_content = text_content[7:]
+        elif text_content.startswith("```"):
+            text_content = text_content[3:]
+        if text_content.endswith("```"):
+            text_content = text_content[:-3]
+        text_content = text_content.strip()
+        
+        return json.loads(text_content)
+        
+    except Exception as sdk_err:
+        print(f"[KYC Scanner] Google GenAI SDK call failed: {sdk_err}. Falling back to REST API.")
+        
+        # REST API fallback using gemini-2.0-flash model
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+        
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inlineData": {
+                                "mimeType": mime_type,
+                                "data": base64_data
+                            }
                         }
-                    }
-                ]
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "responseMimeType": "application/json"
             }
-        ],
-        "generationConfig": {
-            "responseMimeType": "application/json"
         }
-    }
-    
-    response = httpx.post(url, json=payload, timeout=20.0)
-    response.raise_for_status()
-    
-    resp_json = response.json()
-    text_content = resp_json["candidates"][0]["content"]["parts"][0]["text"].strip()
-    
-    # Strip markdown blocks if present
-    if text_content.startswith("```json"):
-        text_content = text_content[7:]
-    if text_content.endswith("```"):
-        text_content = text_content[:-3]
-    text_content = text_content.strip()
-    
-    return json.loads(text_content)
+        
+        response = httpx.post(url, json=payload, timeout=20.0)
+        response.raise_for_status()
+        
+        resp_json = response.json()
+        text_content = resp_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+        
+        # Clean response if markdown code block is present
+        if text_content.startswith("```json"):
+            text_content = text_content[7:]
+        elif text_content.startswith("```"):
+            text_content = text_content[3:]
+        if text_content.endswith("```"):
+            text_content = text_content[:-3]
+        text_content = text_content.strip()
+        
+        return json.loads(text_content)
+
 
 # --- Routes ---
 
@@ -170,21 +199,26 @@ def scan_document(request: KycScanRequest, db: Session = Depends(get_db)):
             extracted_data = {
                 "name": "Ravi Kumar",
                 "dob": "15/06/1985",
-                "address": "Kallahalli, Mandya",
-                "aadhaar_last4": "1234"
+                "address": "Kallahalli, Mandya, Karnataka, 571401",
+                "aadhaar_last4": "1234",
+                "gender": "Male"
             }
         elif request.doc_type == "ration":
             extracted_data = {
                 "name": "Ravi Kumar",
+                "address": "Kallahalli, Mandya, Karnataka, 571401",
                 "ration_number": "KA-MN-12345",
-                "family_members": "4"
+                "category": "BPL",
+                "family_members": 4
             }
         elif request.doc_type == "land":
             extracted_data = {
+                "owner_name": "Ravi Kumar",
                 "survey_number": "KA-MND-045",
-                "area_acres": "2.0",
+                "area_acres": 2.0,
                 "district": "Mandya",
-                "owner_name": "Ravi Kumar"
+                "taluk": "Mandya Taluk",
+                "village": "Kallahalli"
             }
 
     # Save to database (upsert: if doc type already exists for user, update it)

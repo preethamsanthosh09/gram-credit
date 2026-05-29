@@ -15,17 +15,17 @@ export const KYCPage = () => {
     aadhaar: {
       uploaded: false,
       fileName: null,
-      fields: { name: '', dob: '', address: '' }
+      fields: { name: '', dob: '', address: '', gender: '' }
     },
     ration: {
       uploaded: false,
       fileName: null,
-      fields: { name: '', rationNumber: '', familyMembers: '' }
+      fields: { name: '', address: '', rationNumber: '', category: '', familyMembers: '' }
     },
     land: {
       uploaded: false,
       fileName: null,
-      fields: { landAcres: '', surveyNumber: '', ownerName: '' }
+      fields: { landAcres: '', surveyNumber: '', ownerName: '', district: '', taluk: '', village: '' }
     }
   });
 
@@ -36,9 +36,9 @@ export const KYCPage = () => {
 
   // Mock datasets for individual parsing fallback
   const MOCK_DATA = {
-    aadhaar: { name: "Ravi Kumar", dob: "15/06/1985", address: "Village Kallahalli, Mandya, Karnataka" },
-    ration: { name: "Ravi Kumar", rationNumber: "RC-MND-48902", familyMembers: "4 Members" },
-    land: { landAcres: "2.0", surveyNumber: "KA-MND-045", ownerName: "Ravi Kumar" }
+    aadhaar: { name: "Ravi Kumar", dob: "15/06/1985", address: "Village Kallahalli, Mandya, Karnataka", gender: "Male" },
+    ration: { name: "Ravi Kumar", address: "Village Kallahalli, Mandya, Karnataka", rationNumber: "RC-MND-48902", category: "BPL", familyMembers: "4 Members" },
+    land: { landAcres: "2.0", surveyNumber: "KA-MND-045", ownerName: "Ravi Kumar", district: "Mandya", taluk: "Mandya Taluk", village: "Kallahalli" }
   };
 
   // Fetch already uploaded documents from FastAPI on mount
@@ -49,9 +49,9 @@ export const KYCPage = () => {
       try {
         const res = await api.get(`/api/kyc/documents/${user.id}`);
         const loadedDocs = {
-          aadhaar: { uploaded: false, fileName: null, fields: { name: '', dob: '', address: '' } },
-          ration: { uploaded: false, fileName: null, fields: { name: '', rationNumber: '', familyMembers: '' } },
-          land: { uploaded: false, fileName: null, fields: { landAcres: '', surveyNumber: '', ownerName: '' } }
+          aadhaar: { uploaded: false, fileName: null, fields: { name: '', dob: '', address: '', gender: '' } },
+          ration: { uploaded: false, fileName: null, fields: { name: '', address: '', rationNumber: '', category: '', familyMembers: '' } },
+          land: { uploaded: false, fileName: null, fields: { landAcres: '', surveyNumber: '', ownerName: '', district: '', taluk: '', village: '' } }
         };
         
         res.data.forEach(doc => {
@@ -67,7 +67,12 @@ export const KYCPage = () => {
               familyMembers: fields.family_members ? `${fields.family_members} Members` : '',
               landAcres: fields.area_acres || '',
               surveyNumber: fields.survey_number || '',
-              ownerName: fields.owner_name || ''
+              ownerName: fields.owner_name || '',
+              gender: fields.gender || '',
+              category: fields.category || '',
+              district: fields.district || '',
+              taluk: fields.taluk || '',
+              village: fields.village || ''
             }
           };
         });
@@ -113,7 +118,12 @@ export const KYCPage = () => {
                 familyMembers: fields.family_members ? `${fields.family_members} Members` : '',
                 landAcres: fields.area_acres || '',
                 surveyNumber: fields.survey_number || '',
-                ownerName: fields.owner_name || ''
+                ownerName: fields.owner_name || '',
+                gender: fields.gender || '',
+                category: fields.category || '',
+                district: fields.district || '',
+                taluk: fields.taluk || '',
+                village: fields.village || ''
               }
             }
           }));
@@ -326,6 +336,12 @@ export const KYCPage = () => {
                       <span className="text-gray-400 font-semibold">DOB</span>
                       <span className="text-gray-800">{docs.aadhaar.fields.dob}</span>
                     </div>
+                    {docs.aadhaar.fields.gender && (
+                      <div className="flex justify-between border-b border-gray-100 pb-1.5">
+                        <span className="text-gray-400 font-semibold">Gender</span>
+                        <span className="text-gray-800">{docs.aadhaar.fields.gender}</span>
+                      </div>
+                    )}
                     <div className="flex flex-col gap-1">
                       <span className="text-gray-400 font-semibold">Address</span>
                       <span className="text-gray-800 leading-normal text-[11px] font-extrabold">{docs.aadhaar.fields.address}</span>
@@ -407,10 +423,22 @@ export const KYCPage = () => {
                       <span className="text-gray-400 font-semibold">Card Number</span>
                       <span className="text-gray-800">{docs.ration.fields.rationNumber}</span>
                     </div>
+                    {docs.ration.fields.category && (
+                      <div className="flex justify-between border-b border-gray-100 pb-1.5">
+                        <span className="text-gray-400 font-semibold">Category</span>
+                        <span className="text-gray-800">{docs.ration.fields.category}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between border-b border-gray-100 pb-1.5">
                       <span className="text-gray-400 font-semibold">Family Size</span>
                       <span className="text-gray-800">{docs.ration.fields.familyMembers}</span>
                     </div>
+                    {docs.ration.fields.address && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-gray-400 font-semibold">Address</span>
+                        <span className="text-gray-800 leading-normal text-[11px] font-extrabold">{docs.ration.fields.address}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -493,6 +521,24 @@ export const KYCPage = () => {
                       <span className="text-gray-400 font-semibold">Survey Number</span>
                       <span className="text-gray-800">{docs.land.fields.surveyNumber}</span>
                     </div>
+                    {docs.land.fields.village && (
+                      <div className="flex justify-between border-b border-gray-100 pb-1.5">
+                        <span className="text-gray-400 font-semibold">Village</span>
+                        <span className="text-gray-800">{docs.land.fields.village}</span>
+                      </div>
+                    )}
+                    {docs.land.fields.taluk && (
+                      <div className="flex justify-between border-b border-gray-100 pb-1.5">
+                        <span className="text-gray-400 font-semibold">Taluk</span>
+                        <span className="text-gray-800">{docs.land.fields.taluk}</span>
+                      </div>
+                    )}
+                    {docs.land.fields.district && (
+                      <div className="flex justify-between border-b border-gray-100 pb-1.5">
+                        <span className="text-gray-400 font-semibold">District</span>
+                        <span className="text-gray-800">{docs.land.fields.district}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
