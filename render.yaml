@@ -1,0 +1,30 @@
+# Render Blueprint Specification for GramCredit Backend
+# Reference: https://render.com/docs/blueprints
+
+services:
+  - type: web
+    name: gramcredit-backend
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9  # Lock Python version to a stable production release
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gramcredit-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true  # Generates a random secure secret key automatically
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: GEMINI_API_KEY
+        sync: false  # Render will prompt the user to input their Gemini API Key on setup
+
+databases:
+  - name: gramcredit-db
+    plan: free  # Provisions a free persistent PostgreSQL database

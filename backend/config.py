@@ -2,8 +2,13 @@ import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Force local SQLite database to prevent global Postgres env overrides from breaking local execution
-if "DATABASE_URL" in os.environ and not os.environ["DATABASE_URL"].startswith("sqlite"):
+# Skip this override when deploying on Render in production
+if "RENDER" not in os.environ and "DATABASE_URL" in os.environ and not os.environ["DATABASE_URL"].startswith("sqlite"):
     os.environ["DATABASE_URL"] = "sqlite:///./gramcredit.db"
+
+# Correct postgres:// prefix to postgresql:// for SQLAlchemy compatibility on Render
+if "DATABASE_URL" in os.environ and os.environ["DATABASE_URL"].startswith("postgres://"):
+    os.environ["DATABASE_URL"] = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
 
 
 class Settings(BaseSettings):
