@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
 import { useAuthStore } from '../store/useAuthStore';
+import { TRANSLATIONS, getTranslator } from '../utils/translations';
 import api from '../api/axios';
 import {
   ResponsiveContainer,
@@ -27,14 +28,16 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 export const ProfilePage = () => {
-  const { user } = useAuthStore();
+  const { user, language: lang = 'EN' } = useAuthStore();
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.EN;
+  const t_str = getTranslator(lang);
   
   // Local profile state initialized with session values
   const [profile, setProfile] = useState({
     name: user?.name || 'Ravi Kumar',
     phone: user?.phone || '7975200593',
     district: 'Mandya',
-    cropType: 'Sugarcane',
+    cropType: t_str("Sugarcane"),
     landAcres: '6.4',
     shgMember: true
   });
@@ -47,6 +50,20 @@ export const ProfilePage = () => {
     { month: 'Mar', score: 70 },
     { month: 'Apr', score: 78 }
   ]);
+
+  const [trust, setTrust] = useState({
+    trustScore: 35,
+    components: {
+      shgMembership: 20,
+      peerVouches: 10,
+      groupRepayment: 5,
+      panchayatEndorsement: 0
+    },
+    vouchers: ["Lakshmi Devi", "Suresh Patil"],
+    shgGroupRepaymentRate: "82%",
+    trustTier: t_str("Community Trusted"),
+    explanation: t_str("Your SHG membership and 2 peer vouches give you 35 trust points, boosting your loan eligibility.")
+  });
 
   const targetScore = 85;
   const pointsNeeded = Math.max(0, targetScore - score);
@@ -67,7 +84,7 @@ export const ProfilePage = () => {
           name: meRes.data.name || 'Ravi Kumar',
           phone: meRes.data.phone || '7975200593',
           district: meRes.data.district || 'Mandya',
-          cropType: meRes.data.crop_type || 'Sugarcane',
+          cropType: meRes.data.crop_type || t_str("Sugarcane"),
           landAcres: String(meRes.data.land_acres || '6.4'),
           shgMember: meRes.data.shg_member !== undefined ? meRes.data.shg_member : true
         });
@@ -75,6 +92,21 @@ export const ProfilePage = () => {
         const scoreRes = await api.get(`/api/auth/credit-score?user_id=${user.id}`);
         setScore(scoreRes.data.score);
         setHistoryData(scoreRes.data.history);
+
+        const trustRes = await api.get(`/api/auth/trust-score?user_id=${user.id}`);
+        setTrust({
+          trustScore: trustRes.data.trust_score,
+          components: {
+            shgMembership: trustRes.data.components.shg_membership,
+            peerVouches: trustRes.data.components.peer_vouches,
+            groupRepayment: trustRes.data.components.group_repayment,
+            panchayatEndorsement: trustRes.data.components.panchayat_endorsement
+          },
+          vouchers: trustRes.data.vouchers,
+          shgGroupRepaymentRate: trustRes.data.shg_group_repayment_rate,
+          trustTier: trustRes.data.trust_tier,
+          explanation: trustRes.data.explanation
+        });
       } catch (err) {
         console.error("FastAPI profile retrieval failed, showing dynamic fallback session details:", err);
       }
@@ -157,8 +189,8 @@ export const ProfilePage = () => {
         
         {/* Header */}
         <header className="max-w-4xl mx-auto mb-6">
-          <h1 className="text-2xl font-black text-gray-900">My Farmer Profile</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Manage your digital agriculture footprint, track your creditworthiness score, and view milestones.</p>
+          <h1 className="text-2xl font-black text-gray-900">{t.profile.title}</h1>
+          <p className="text-xs text-gray-500 mt-0.5">{t_str("Manage your digital agriculture footprint, track your creditworthiness score, and view milestones.")}</p>
         </header>
 
         {/* Dashboard Panels Grid */}
@@ -210,10 +242,10 @@ export const ProfilePage = () => {
               </div>
 
               <div className="text-center mt-3">
-                <p className="text-xs font-black text-gray-800">GramCredit Score</p>
+                <p className="text-xs font-black text-gray-800">{t_str("GramCredit Score")}</p>
                 <div className="mt-2 flex items-center justify-center gap-1.5">
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase">
-                    Good Standing
+                    {t_str("Good Standing")}
                   </span>
                 </div>
                 <p className="text-[9px] text-gray-400 font-bold mt-2">Last updated: today</p>
@@ -226,12 +258,74 @@ export const ProfilePage = () => {
                   <p className="text-gray-800 font-black mt-0.5">1 Loan</p>
                 </div>
                 <div className="border-r border-gray-100">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">On-Time</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-semibold">{t_str("On-Time")}</p>
                   <p className="text-gray-800 font-black mt-0.5">3 PMTs</p>
                 </div>
                 <div>
                   <p className="text-[9px] text-gray-400 uppercase font-semibold">SHG</p>
                   <p className="text-green-600 font-black mt-0.5">✅ Yes</p>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Village Trust Score Card */}
+            <div className="bg-white border-2 border-indigo-500 rounded-3xl p-5 shadow-sm space-y-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-indigo-500"></div>
+              
+              <div className="flex justify-between items-center">
+                <span className="inline-flex px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase tracking-wider">
+                  🤝 Village Trust Network
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200">
+                  {trust.trustTier}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-col shadow-sm">
+                  <span className="text-2xl font-black text-indigo-600">+{trust.trustScore}</span>
+                  <span className="text-[7px] text-indigo-400 font-extrabold uppercase tracking-widest -mt-1">Points</span>
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-black text-gray-800">{t_str("Community Trust Bonus")}</h4>
+                  <p className="text-[10px] text-gray-400 font-semibold leading-normal">Vouches and group behavior boosting credit capacity.</p>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-gray-500 font-bold leading-normal bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                {trust.explanation}
+              </p>
+
+              {/* Trust breakdown grid */}
+              <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-500">
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100/50">
+                  <span className="text-gray-400 text-[9px] block">SHG Bonus</span>
+                  <span className="text-gray-800 font-black text-xs">+{trust.components.shgMembership} pts</span>
+                </div>
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100/50">
+                  <span className="text-gray-400 text-[9px] block">{t_str("Peer Vouches")}</span>
+                  <span className="text-gray-800 font-black text-xs">+{trust.components.peerVouches} pts</span>
+                </div>
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100/50">
+                  <span className="text-gray-400 text-[9px] block">Group Performance</span>
+                  <span className="text-gray-800 font-black text-xs">+{trust.components.groupRepayment} pts ({trust.shgGroupRepaymentRate})</span>
+                </div>
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100/50">
+                  <span className="text-gray-400 text-[9px] block">{t_str("Panchayat Endorsement")}</span>
+                  <span className="text-gray-800 font-black text-xs">+{trust.components.panchayatEndorsement} pts</span>
+                </div>
+              </div>
+
+              {/* Vouchers lists */}
+              <div className="pt-2 border-t border-gray-50">
+                <p className="text-[9px] text-gray-400 uppercase font-black tracking-wider mb-1.5">Vouched by:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {trust.vouchers.map((name, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100">
+                      👤 {name}
+                    </span>
+                  ))}
                 </div>
               </div>
 
@@ -273,7 +367,7 @@ export const ProfilePage = () => {
                 <ul className="space-y-1.5 text-[10px] font-bold text-gray-600">
                   <li className="flex items-start gap-1.5">
                     <span className="text-amber-500">🌾</span>
-                    <span>Repay next EMI on time <span className="text-green-600 font-extrabold">(+10 pts)</span></span>
+                    <span>{t_str("Repay next EMI on time")} <span className="text-green-600 font-extrabold">(+10 pts)</span></span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="text-amber-500">📄</span>
@@ -292,7 +386,7 @@ export const ProfilePage = () => {
             {/* Score History Recharts Bar Chart */}
             <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm space-y-4">
               <div>
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Score Growth History</h3>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t_str("Score Growth History")}</h3>
                 <p className="text-[10px] text-gray-500 font-medium">Monthly progress mapping showing consecutive digital rating growth.</p>
               </div>
               
@@ -328,7 +422,7 @@ export const ProfilePage = () => {
             <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-5">
               <div>
                 <h3 className="text-base font-black text-gray-800">Farmer Registry Details</h3>
-                <p className="text-xs text-gray-400 font-medium">Keep your registration details accurate to increase credit limits and quicken KYC verify checks.</p>
+                <p className="text-xs text-gray-400 font-medium">{t_str("Keep your registration details accurate to increase credit limits and quicken KYC verify checks.")}</p>
               </div>
 
               <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -393,17 +487,17 @@ export const ProfilePage = () => {
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 focus:bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 rounded-xl font-bold text-sm text-gray-800 transition-all shadow-inner"
                       disabled={isSaving}
                     >
-                      <option value="Paddy">Paddy</option>
-                      <option value="Wheat">Wheat</option>
-                      <option value="Sugarcane">Sugarcane</option>
-                      <option value="Cotton">Cotton</option>
-                      <option value="Maize">Maize</option>
+                      <option value={t_str("Paddy")}>{t_str("Paddy")}</option>
+                      <option value={t_str("Wheat")}>{t_str("Wheat")}</option>
+                      <option value={t_str("Sugarcane")}>{t_str("Sugarcane")}</option>
+                      <option value={t_str("Cotton")}>{t_str("Cotton")}</option>
+                      <option value={t_str("Maize")}>{t_str("Maize")}</option>
                     </select>
                   </div>
 
                   {/* Land Acres Field */}
                   <div className="space-y-1.5">
-                    <label htmlFor="acres-input" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Land Area (Acres)</label>
+                    <label htmlFor="acres-input" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{t_str("Land Area (Acres)")}</label>
                     <input
                       id="acres-input"
                       type="number"
@@ -422,7 +516,7 @@ export const ProfilePage = () => {
                 <div className="flex items-center justify-between p-4 bg-gray-50/50 border border-gray-100 rounded-2xl">
                   <div className="space-y-0.5">
                     <p className="text-xs font-black text-gray-800">Self Help Group (SHG) Member</p>
-                    <p className="text-[10px] text-gray-400 font-semibold">Being a certified SHG member grants special low-interest crop refinancing.</p>
+                    <p className="text-[10px] text-gray-400 font-semibold">{t_str("Being a certified SHG member grants special low-interest crop refinancing.")}</p>
                   </div>
                   
                   {/* Toggle button element */}

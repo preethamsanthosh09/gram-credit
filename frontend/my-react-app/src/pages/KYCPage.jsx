@@ -4,10 +4,13 @@ import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
 import api from '../api/axios';
 import { useAuthStore } from '../store/useAuthStore';
+import { TRANSLATIONS, getTranslator } from '../utils/translations';
 
 export const KYCPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, language: lang = 'EN' } = useAuthStore();
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.EN;
+  const t_str = getTranslator(lang);
   const [isScanning, setIsScanning] = useState(false);
 
   // Document states
@@ -92,7 +95,7 @@ export const KYCPage = () => {
       const file = e.target.files[0];
       const reader = new FileReader();
       
-      toast.loading(`Uploading and scanning ${type === 'aadhaar' ? 'Aadhaar Card' : type === 'ration' ? 'Ration Card' : 'Land Record'}…`, { id: `upload-${type}` });
+      toast.loading(`Uploading and scanning ${type === 'aadhaar' ? t_str("Aadhaar Card") : type === 'ration' ? t_str("Ration Card") : t_str("Land Record")}…`, { id: `upload-${type}` });
       
       reader.onload = async () => {
         const base64Data = reader.result;
@@ -127,10 +130,10 @@ export const KYCPage = () => {
               }
             }
           }));
-          toast.success(`${type === 'aadhaar' ? 'Aadhaar Card' : type === 'ration' ? 'Ration Card' : 'Land Document'} verified by AI!`, { id: `upload-${type}` });
+          toast.success(`${type === 'aadhaar' ? t_str("Aadhaar Card") : type === 'ration' ? t_str("Ration Card") : t_str("Land Document")} verified by AI!`, { id: `upload-${type}` });
         } catch (err) {
           console.error("KYC scan failed, using simulated parsing fallback:", err);
-          toast.success(`${type === 'aadhaar' ? 'Aadhaar Card' : type === 'ration' ? 'Ration Card' : 'Land Document'} uploaded!`, { id: `upload-${type}` });
+          toast.success(`${type === 'aadhaar' ? t_str("Aadhaar Card") : type === 'ration' ? t_str("Ration Card") : t_str("Land Document")} uploaded!`, { id: `upload-${type}` });
           setDocs(prev => ({
             ...prev,
             [type]: {
@@ -156,7 +159,7 @@ export const KYCPage = () => {
   // Scan all documents with AI (2.5s spinner)
   const handleScanAll = async () => {
     setIsScanning(true);
-    toast.loading("AI is scanning and verifying documents...", { id: "scanning-toast" });
+    toast.loading(t_str("AI is scanning and verifying documents..."), { id: "scanning-toast" });
 
     try {
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -208,7 +211,7 @@ export const KYCPage = () => {
               </span>
               <div className="text-left">
                 <p className="text-xs font-bold text-green-600 uppercase tracking-widest">Step 1</p>
-                <p className="text-sm font-extrabold text-gray-800">KYC Verification</p>
+                <p className="text-sm font-extrabold text-gray-800">{t_str("KYC Verification")}</p>
               </div>
             </div>
 
@@ -243,8 +246,8 @@ export const KYCPage = () => {
         {/* Page Header */}
         <div className="max-w-6xl mx-auto mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-black text-gray-900">Document KYC Verification</h1>
-            <p className="text-sm text-gray-500 mt-1">Upload files or run an instant AI scan to auto-fill crop credit registry fields.</p>
+            <h1 className="text-2xl font-black text-gray-900">{t.kyc.title}</h1>
+            <p className="text-sm text-gray-500 mt-1">{t_str("Upload files or run an instant AI scan to auto-fill crop credit registry fields.")}</p>
           </div>
           
           {/* Scan All Button */}
@@ -286,7 +289,7 @@ export const KYCPage = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M21 12h-4m4 4h-4" />
                     </svg>
                   </div>
-                  <span className="font-extrabold text-gray-800 text-sm">Aadhaar Card</span>
+                  <span className="font-extrabold text-gray-800 text-sm">{t_str("Aadhaar Card")}</span>
                 </div>
                 {docs.aadhaar.uploaded && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
@@ -313,7 +316,7 @@ export const KYCPage = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="text-xs font-bold text-gray-600">Click to upload</span>
+                  <span className="text-xs font-bold text-gray-600">{t_str("Click to upload")}</span>
                   <span className="text-[10px] text-gray-400 font-medium">JPEG, PNG, or PDF</span>
                 </div>
               ) : (
@@ -357,7 +360,7 @@ export const KYCPage = () => {
                 onClick={() => triggerUpload('aadhaar')}
                 className="w-full mt-4 py-2 border border-blue-200 hover:border-blue-300 text-blue-600 text-xs font-bold rounded-xl hover:bg-blue-50/10 transition-colors"
               >
-                Re-upload
+                {t_str("Re-upload")}
               </button>
             )}
           </div>
@@ -373,7 +376,7 @@ export const KYCPage = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
                   </div>
-                  <span className="font-extrabold text-gray-800 text-sm">Ration Card</span>
+                  <span className="font-extrabold text-gray-800 text-sm">{t_str("Ration Card")}</span>
                 </div>
                 {docs.ration.uploaded && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
@@ -400,7 +403,7 @@ export const KYCPage = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="text-xs font-bold text-gray-600">Click to upload</span>
+                  <span className="text-xs font-bold text-gray-600">{t_str("Click to upload")}</span>
                   <span className="text-[10px] text-gray-400 font-medium">JPEG, PNG, or PDF</span>
                 </div>
               ) : (
@@ -416,7 +419,7 @@ export const KYCPage = () => {
                   {/* Extracted Fields */}
                   <div className="bg-gray-50 border border-gray-100 p-3.5 rounded-xl space-y-2.5 text-xs font-bold">
                     <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                      <span className="text-gray-400 font-semibold">Head of Family</span>
+                      <span className="text-gray-400 font-semibold">{t_str("Head of Family")}</span>
                       <span className="text-gray-800">{docs.ration.fields.name}</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-100 pb-1.5">
@@ -430,7 +433,7 @@ export const KYCPage = () => {
                       </div>
                     )}
                     <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                      <span className="text-gray-400 font-semibold">Family Size</span>
+                      <span className="text-gray-400 font-semibold">{t_str("Family Size")}</span>
                       <span className="text-gray-800">{docs.ration.fields.familyMembers}</span>
                     </div>
                     {docs.ration.fields.address && (
@@ -450,7 +453,7 @@ export const KYCPage = () => {
                 onClick={() => triggerUpload('ration')}
                 className="w-full mt-4 py-2 border border-amber-200 hover:border-amber-300 text-amber-600 text-xs font-bold rounded-xl hover:bg-amber-50/10 transition-colors"
               >
-                Re-upload
+                {t_str("Re-upload")}
               </button>
             )}
           </div>
@@ -467,7 +470,7 @@ export const KYCPage = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </div>
-                  <span className="font-extrabold text-gray-800 text-sm">Land Document</span>
+                  <span className="font-extrabold text-gray-800 text-sm">{t_str("Land Document")}</span>
                 </div>
                 {docs.land.uploaded && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
@@ -494,7 +497,7 @@ export const KYCPage = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="text-xs font-bold text-gray-600">Click to upload</span>
+                  <span className="text-xs font-bold text-gray-600">{t_str("Click to upload")}</span>
                   <span className="text-[10px] text-gray-400 font-medium">JPEG, PNG, or PDF</span>
                 </div>
               ) : (
@@ -510,15 +513,15 @@ export const KYCPage = () => {
                   {/* Extracted Fields */}
                   <div className="bg-gray-50 border border-gray-100 p-3.5 rounded-xl space-y-2.5 text-xs font-bold">
                     <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                      <span className="text-gray-400 font-semibold">Registered Owner</span>
+                      <span className="text-gray-400 font-semibold">{t_str("Registered Owner")}</span>
                       <span className="text-gray-800">{docs.land.fields.ownerName}</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                      <span className="text-gray-400 font-semibold">Total Area</span>
+                      <span className="text-gray-400 font-semibold">{t_str("Total Area")}</span>
                       <span className="text-gray-800">{docs.land.fields.landAcres} Acres</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                      <span className="text-gray-400 font-semibold">Survey Number</span>
+                      <span className="text-gray-400 font-semibold">{t_str("Survey Number")}</span>
                       <span className="text-gray-800">{docs.land.fields.surveyNumber}</span>
                     </div>
                     {docs.land.fields.village && (
@@ -550,7 +553,7 @@ export const KYCPage = () => {
                 onClick={() => triggerUpload('land')}
                 className="w-full mt-4 py-2 border border-green-200 hover:border-green-300 text-green-600 text-xs font-bold rounded-xl hover:bg-green-50/10 transition-colors"
               >
-                Re-upload
+                {t_str("Re-upload")}
               </button>
             )}
           </div>
@@ -564,7 +567,7 @@ export const KYCPage = () => {
             disabled={!docs.aadhaar.uploaded || !docs.ration.uploaded || !docs.land.uploaded}
             className="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-base font-extrabold rounded-2xl shadow-xl shadow-green-600/15 transition-all duration-200 active:scale-98 flex items-center justify-center gap-2"
           >
-            <span>Continue to Loan Application</span>
+            <span>{t_str("Continue to Loan Application")}</span>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>

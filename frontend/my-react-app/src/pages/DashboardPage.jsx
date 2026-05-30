@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useAuthStore } from '../store/useAuthStore';
+import { TRANSLATIONS, getTranslator } from '../utils/translations';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, language: lang = 'EN' } = useAuthStore();
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.EN;
+  const t_str = getTranslator(lang);
   const [loanAmount, setLoanAmount] = useState('');
   const [loanPurpose, setLoanPurpose] = useState('seeds');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,10 +29,10 @@ export const DashboardPage = () => {
           const dateObj = new Date(loan.created_at);
           const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
           
-          let statusText = "Pending Approval";
-          if (loan.status === "approved") statusText = "Disbursed";
-          else if (loan.status === "rejected") statusText = "Rejected";
-          else if (loan.status === "paid") statusText = "Paid";
+          let statusText = t.dashboard.pending;
+          if (loan.status === "approved") statusText = t.dashboard.disbursed;
+          else if (loan.status === "rejected") statusText = t.dashboard.rejected;
+          else if (loan.status === "paid") statusText = t.dashboard.paid;
           
           return {
             id: `LN-${loan.id}`,
@@ -48,8 +51,8 @@ export const DashboardPage = () => {
       } catch (err) {
         console.error("FastAPI dashboard request failed, using demo fallback data:", err);
         setActiveLoans([
-          { id: 'LN-9082', amount: 45000, purpose: 'Tractor Maintenance', status: 'Disbursed', date: 'May 12, 2026' },
-          { id: 'LN-7612', amount: 15000, purpose: 'Organic Fertilizer', status: 'Paid', date: 'April 02, 2026' }
+          { id: 'LN-9082', amount: 45000, purpose: t_str("Tractor Maintenance"), status: 'Disbursed', date: 'May 12, 2026' },
+          { id: 'LN-7612', amount: 15000, purpose: t_str("Organic Fertilizer"), status: 'Paid', date: 'April 02, 2026' }
         ]);
       }
     };
@@ -63,17 +66,17 @@ export const DashboardPage = () => {
     .reduce((sum, l) => sum + l.amount, 0);
 
   const stats = [
-    { title: 'Total Active Credit', value: `₹${totalActiveCredit.toLocaleString()}`, subtitle: `${activeLoans.filter(l => l.status === 'Disbursed').length} active loan(s)`, color: 'text-green-600' },
-    { title: 'Approved Limit', value: `₹${maxAmount.toLocaleString()}`, subtitle: 'Based on land holding', color: 'text-emerald-600' },
-    { title: 'Next Payment Due', value: totalActiveCredit > 0 ? `₹${Math.round(totalActiveCredit * 0.08 / 12 + totalActiveCredit / 12).toLocaleString()}` : '₹0', subtitle: 'Calculated post-harvest', color: 'text-amber-600' },
-    { title: 'Registered Acreage', value: user?.land_acres ? `${user.land_acres} Acres` : '6.4 Acres', subtitle: 'Verified via Bhoomi API', color: 'text-blue-600' }
+    { title: t.dashboard.statActive, value: `₹${totalActiveCredit.toLocaleString()}`, subtitle: `${activeLoans.filter(l => l.status === 'Disbursed').length} ${t.dashboard.activeLoanCount}`, color: 'text-green-600' },
+    { title: t.dashboard.statLimit, value: `₹${maxAmount.toLocaleString()}`, subtitle: t.dashboard.limitBased, color: 'text-emerald-600' },
+    { title: t.dashboard.statDue, value: totalActiveCredit > 0 ? `₹${Math.round(totalActiveCredit * 0.08 / 12 + totalActiveCredit / 12).toLocaleString()}` : '₹0', subtitle: t.dashboard.calcHarvest, color: 'text-amber-600' },
+    { title: t.dashboard.statAcres, value: user?.land_acres ? `${user.land_acres} ${t.profile.acres || 'Acres'}` : `6.4 ${t.profile.acres || 'Acres'}`, subtitle: t.dashboard.verifiedBhoomi, color: 'text-blue-600' }
   ];
 
   const handleApplyLoan = async (e) => {
     e.preventDefault();
     const amount = parseFloat(loanAmount);
     if (!amount || amount <= 0) {
-      toast.error('Please enter a valid loan amount');
+      toast.error(t.dashboard.enterAmount);
       return;
     }
 
@@ -81,7 +84,7 @@ export const DashboardPage = () => {
     try {
       const payload = {
         user_id: user.id,
-        crop_type: user.crop_type || "Paddy",
+        crop_type: user.crop_type || t_str("Paddy"),
         land_acres: user.land_acres || 4.0,
         shg_member: user.shg_member || true,
         amount: amount,
@@ -132,15 +135,15 @@ export const DashboardPage = () => {
         {/* Top Header */}
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">GramCredit Farmer Dashboard</h1>
-            <p className="text-sm text-gray-500 mt-1">Hello, {user?.name || 'Ravi Kumar'} • Harvesting progress and credit statements.</p>
+            <h1 className="text-2xl font-extrabold text-gray-900">{t.dashboard.title}</h1>
+            <p className="text-sm text-gray-500 mt-1">{t.dashboard.welcome}, {user?.name || 'Ravi Kumar'} • {t.dashboard.title}.</p>
           </div>
           <div className="flex gap-2">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
               ● Server Connected
             </span>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
-              ₹ INR (English)
+              ₹ INR ({lang})
             </span>
           </div>
         </header>
@@ -184,17 +187,17 @@ export const DashboardPage = () => {
                       onChange={(e) => setLoanPurpose(e.target.value)}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-medium focus:outline-none focus:border-green-500 focus:bg-white text-gray-800 transition-all text-sm"
                     >
-                      <option value="seeds">High-Yield Seeds</option>
-                      <option value="fertilizer">Organic Fertilizers</option>
-                      <option value="equipment">Farming Machinery</option>
-                      <option value="irrigation">Drip Irrigation System</option>
+                      <option value="seeds">{t.dashboard.seeds}</option>
+                      <option value="fertilizer">{t.dashboard.fertilizer}</option>
+                      <option value="equipment">{t.dashboard.tractor}</option>
+                      <option value="irrigation">{t.dashboard.irrigation}</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-600 block">Required Amount (₹)</label>
+                    <label className="text-xs font-semibold text-gray-600 block">{t.dashboard.tableAmount} (₹)</label>
                     <input
                       type="number"
-                      placeholder="e.g. 25000"
+                      placeholder={t.dashboard.enterAmount}
                       value={loanAmount}
                       onChange={(e) => setLoanAmount(e.target.value)}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold focus:outline-none focus:border-green-500 focus:bg-white text-gray-800 transition-all text-sm"
@@ -207,7 +210,7 @@ export const DashboardPage = () => {
                   disabled={isSubmitting}
                   className="w-full py-3.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-600/10 transition-all flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? 'Submitting Application...' : 'Submit Credit Application'}
+                  {isSubmitting ? t.dashboard.applying : t.dashboard.applyBtn}
                 </button>
               </form>
             </div>
@@ -215,24 +218,24 @@ export const DashboardPage = () => {
             {/* Active Credit Table */}
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-gray-800">Credit Statements</h2>
+                <h2 className="text-lg font-bold text-gray-800">{t.dashboard.activeLoans}</h2>
                 <button
                   onClick={() => navigate('/loans')}
                   className="text-xs font-extrabold text-green-600 hover:text-green-700 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-green-50 transition-all"
                 >
-                  View All Loans →
+                  {t.loans.activeLoans} →
                 </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100 text-xs font-bold text-gray-400 uppercase">
-                      <th className="pb-3 font-semibold">Loan ID</th>
-                      <th className="pb-3 font-semibold">Purpose</th>
-                      <th className="pb-3 font-semibold text-right">Amount</th>
-                      <th className="pb-3 font-semibold text-center">Status</th>
-                      <th className="pb-3 font-semibold text-right">Date</th>
-                      <th className="pb-3 font-semibold text-right">Action</th>
+                      <th className="pb-3 font-semibold">{t.dashboard.tableId}</th>
+                      <th className="pb-3 font-semibold">{t.dashboard.tablePurpose}</th>
+                      <th className="pb-3 font-semibold text-right">{t.dashboard.tableAmount}</th>
+                      <th className="pb-3 font-semibold text-center">{t.dashboard.tableStatus}</th>
+                      <th className="pb-3 font-semibold text-right">{t.dashboard.tableDate}</th>
+                      <th className="pb-3 font-semibold text-right">{t.vendors.action}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 text-sm font-bold text-gray-700">
@@ -243,7 +246,7 @@ export const DashboardPage = () => {
                         className="hover:bg-green-50/30 transition-colors cursor-pointer"
                       >
                         <td className="py-4 text-xs font-mono text-green-600 underline underline-offset-2">{loan.id}</td>
-                        <td className="py-4 text-gray-800">{loan.purpose}</td>
+                        <td className="py-4 text-gray-800">{t_str(loan.purpose)}</td>
                         <td className="py-4 text-right text-green-600">₹{loan.amount.toLocaleString()}</td>
                         <td className="py-4 text-center">
                           <span
@@ -283,15 +286,15 @@ export const DashboardPage = () => {
               <h3 className="text-base font-bold text-gray-800 mb-4">🌾 APMC Market Rates (Today)</h3>
               <div className="space-y-3 text-xs font-bold">
                 <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                  <span className="text-gray-600">Wheat (Premium)</span>
+                  <span className="text-gray-600">{t_str("Wheat (Premium)")}</span>
                   <span className="text-gray-900">₹2,450 <span className="text-gray-400">/ Quintal</span></span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                  <span className="text-gray-600">Rice (Basmati)</span>
+                  <span className="text-gray-600">{t_str("Rice (Basmati)")}</span>
                   <span className="text-gray-900">₹6,800 <span className="text-gray-400">/ Quintal</span></span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                  <span className="text-gray-600">Cotton</span>
+                  <span className="text-gray-600">{t_str("Cotton")}</span>
                   <span className="text-gray-900">₹7,200 <span className="text-gray-400">/ Quintal</span></span>
                 </div>
               </div>

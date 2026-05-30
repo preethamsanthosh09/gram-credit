@@ -271,3 +271,16 @@ def update_credit_score(request: ScoreUpdateRequest, db: Session = Depends(get_d
         "new_score": user.credit_score
     }
 
+
+@router.get("/trust-score")
+def get_trust_score(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found."
+        )
+    from services.trust_score import calculate_trust_score
+    return calculate_trust_score(user_id, db)
+
+

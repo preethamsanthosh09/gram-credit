@@ -1,14 +1,18 @@
 import httpx
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import Optional
 from config import settings
+from database import get_db
+from sqlalchemy.orm import Session
+from models.user import User
 
 router = APIRouter(prefix="/api/chatbot", tags=["chatbot"])
 
 class ChatMessageRequest(BaseModel):
     message: str
     language: str
+    user_id: Optional[int] = None
 
 class ChatMessageResponse(BaseModel):
     reply: str
@@ -96,9 +100,62 @@ NEVER:
 - Share personal data
 - Recommend illegal money lenders"""
 
+SCHEME_MATCHER_PROMPT = """Given this farmer profile:
+- Name: {name}
+- Crop: {crop_type}
+- Land: {land_acres} acres
+- District: {district}
+- SHG Member: {shg_member}
+- Annual income estimate: ₹{estimated_income}
+
+Analyze which government schemes they qualify for and explain in simple language.
+
+Schemes to check:
+1. PM-Kisan: ₹6,000/year — requires land < 2 hectares
+2. PMFBY: Crop insurance 2% premium — any farmer
+3. Kisan Credit Card: ₹3 lakh at 7% — active farmer
+4. Soil Health Card: Free soil testing — any farmer
+5. PM Kisan Maandhan Pension: ₹3,000/month after 60 — age 18-40
+
+Reply in the same language as the user's last message.
+For each eligible scheme: explain benefit in one simple sentence using rupee amounts.
+Format: "You qualify for [scheme name] — this gives you [benefit in simple words]."
+End with: "Shall I help you apply for any of these?" """
+
 
 @router.post("/message", response_model=ChatMessageResponse)
-async def get_chatbot_message(request: ChatMessageRequest):
+async def get_chatbot_message(request: ChatMessageRequest, db: Session = Depends(get_db)):
+    # 1. Parse query to detect schemes request
+    is_scheme_query = any(kw in request.message.lower() for kw in ["scheme", "yojana", "ಯೋಜನೆ", "योजना"])
+    
+    user_content = request.message
+    if is_scheme_query:
+        # Load user profile from DB with fallbacks for demo
+        user_name = "Ravi Kumar"
+        user_crop = "Sugarcane"
+        user_land_acres = 6.4
+        user_district = "Mandya"
+        user_shg = True
+        
+        if request.user_id:
+            db_user = db.query(User).filter(User.id == request.user_id).first()
+            if db_user:
+                user_name = db_user.name or "Ravi Kumar"
+                user_crop = db_user.crop_type or "Sugarcane"
+                user_land_acres = db_user.land_acres or 6.4
+                user_district = db_user.district or "Mandya"
+                user_shg = db_user.shg_member if db_user.shg_member is not None else True
+        
+        estimated_income = round(user_land_acres * 40000)
+        user_content = SCHEME_MATCHER_PROMPT.format(
+            name=user_name,
+            crop_type=user_crop,
+            land_acres=user_land_acres,
+            district=user_district,
+            shg_member="Yes" if user_shg else "No",
+            estimated_income=estimated_income
+        )
+
     if settings.GEMINI_API_KEY:
         # Try google-genai SDK first
         try:
@@ -109,7 +166,7 @@ async def get_chatbot_message(request: ChatMessageRequest):
             
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents=request.message,
+                contents=user_content,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT
                 )
@@ -132,7 +189,7 @@ async def get_chatbot_message(request: ChatMessageRequest):
                     "contents": [
                         {
                             "parts": [
-                                {"text": request.message}
+                                {"text": user_content}
                             ]
                         }
                     ]

@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAuthStore } from '../store/useAuthStore';
+import { TRANSLATIONS, getTranslator } from '../utils/translations';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
@@ -6,6 +8,16 @@ import api from '../api/axios';
 
 export const LoansPage = () => {
   const navigate = useNavigate();
+  const { language: lang = 'EN' } = useAuthStore();
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.EN;
+  const t_str = getTranslator(lang);
+
+  const getLoanIcon = (cropType) => {
+    const lower = (cropType || '').toLowerCase();
+    if (lower.includes('education')) return '🎓';
+    if (lower.includes('kirana') || lower.includes('vendor') || lower.includes('store') || lower.includes('seller') || lower.includes('milk') || lower.includes('hardware') || lower.includes('cloth') || lower.includes('driver') || lower.includes('business')) return '🏪';
+    return '🌾';
+  };
 
   // Active filter tab: 'All', 'Pending', 'Approved', 'Rejected'
   const [activeTab, setActiveTab] = useState('All');
@@ -58,7 +70,7 @@ export const LoansPage = () => {
           rawId: 1,
           name: "Ravi Kumar",
           phone: "+91 7975200593",
-          crop: "Paddy",
+          crop: t_str("Paddy"),
           district: "Mandya",
           amount: 45000,
           score: 84,
@@ -74,7 +86,7 @@ export const LoansPage = () => {
           rawId: 2,
           name: "Lakshmi Devi",
           phone: "+91 9845209812",
-          crop: "Wheat",
+          crop: t_str("Wheat"),
           district: "Belagavi",
           amount: 65000,
           score: 78,
@@ -102,7 +114,7 @@ export const LoansPage = () => {
       const targetId = rawId || parseInt(id.replace("LN-", ""));
       await api.patch(`/api/loans/${targetId}/approve`);
       updateLoanStatus(id, "Approved");
-      toast.success("Approved! SMS sent.", { id: "decision-toast" });
+      toast.success(t_str("Approved! SMS sent."), { id: "decision-toast" });
     } catch (err) {
       console.error(err);
       toast.error("Cooperative approval failed.", { id: "decision-toast" });
@@ -120,7 +132,7 @@ export const LoansPage = () => {
       const targetId = rawId || parseInt(id.replace("LN-", ""));
       await api.patch(`/api/loans/${targetId}/reject`, { reason: "Did not clear cooperative credit thresholds" });
       updateLoanStatus(id, "Rejected");
-      toast.error("Application Rejected.", { id: "decision-toast" });
+      toast.error(t_str("Application Rejected."), { id: "decision-toast" });
     } catch (err) {
       console.error(err);
       toast.error("Cooperative rejection failed.", { id: "decision-toast" });
@@ -162,8 +174,8 @@ export const LoansPage = () => {
           {/* Header Row */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
-              <h1 className="text-xl font-black text-gray-900">Cooperative Loan Registry</h1>
-              <p className="text-xs text-gray-500 mt-0.5">Manage and review credit deeds submitted by farmers across districts.</p>
+              <h1 className="text-xl font-black text-gray-900">{t.loans.title}</h1>
+              <p className="text-xs text-gray-500 mt-0.5">{t.loans.subtitle}</p>
             </div>
             
             <button
@@ -173,13 +185,13 @@ export const LoansPage = () => {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
-              <span>+ New Application</span>
+              <span>+ {t.loans.applyNewLoan}</span>
             </button>
           </div>
 
           {/* Filter Tabs Row */}
           <div className="flex border-b border-gray-100 mb-5 text-xs font-bold">
-            {['All', 'Pending', 'Approved', 'Rejected'].map((tab) => {
+            {[t.sidebar.all || 'All', t.dashboard.pending, t.dashboard.disbursed, t.dashboard.rejected].map((tab) => {
               const isActive = activeTab === tab;
               return (
                 <button
@@ -203,13 +215,13 @@ export const LoansPage = () => {
             <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 <tr className="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  <th className="pb-3">Farmer</th>
-                  <th className="pb-3">Crop</th>
-                  <th className="pb-3">District</th>
-                  <th className="pb-3 text-right">Amount</th>
-                  <th className="pb-3 text-center">Credit Score</th>
-                  <th className="pb-3 text-center">Status</th>
-                  <th className="pb-3 text-right">Applied Date</th>
+                  <th className="pb-3">{t.profile.name}</th>
+                  <th className="pb-3">{t.profile.cropType}</th>
+                  <th className="pb-3">{t.profile.district}</th>
+                  <th className="pb-3 text-right">{t.dashboard.tableAmount}</th>
+                  <th className="pb-3 text-center">{t.profile.trustScore}</th>
+                  <th className="pb-3 text-center">{t.dashboard.tableStatus}</th>
+                  <th className="pb-3 text-right">{t.dashboard.tableDate}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 text-xs font-bold text-gray-700">
@@ -237,7 +249,10 @@ export const LoansPage = () => {
                             <p className="text-[10px] text-gray-400 font-medium mt-0.5 font-mono">{loan.phone}</p>
                           </div>
                         </td>
-                        <td className="py-3.5 text-gray-800">{loan.crop}</td>
+                        <td className="py-3.5 text-gray-800 flex items-center gap-1.5">
+                          <span>{getLoanIcon(loan.crop)}</span>
+                          <span>{loan.crop}</span>
+                        </td>
                         <td className="py-3.5 text-gray-500 font-semibold">{loan.district}</td>
                         <td className="py-3.5 text-right text-gray-800 font-extrabold">₹{loan.amount.toLocaleString()}</td>
                         <td className="py-3.5 text-center">
@@ -311,42 +326,56 @@ export const LoansPage = () => {
               </div>
 
               {/* Borrowing Details */}
-              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3 text-xs font-bold text-gray-700">
-                <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
-                  <span className="text-gray-400">Crop Cultivation</span>
-                  <span className="text-gray-800">{selectedLoan.crop}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
-                  <span className="text-gray-400">Land Area</span>
-                  <span className="text-gray-800">{selectedLoan.land}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
-                  <span className="text-gray-400">District</span>
-                  <span className="text-gray-800">{selectedLoan.district}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
-                  <span className="text-gray-400">SHG Affiliation</span>
-                  <span className="text-gray-800 truncate max-w-[120px]">{selectedLoan.shg}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
-                  <span className="text-gray-400">Principal Principle</span>
-                  <span className="text-green-600">₹{selectedLoan.amount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Annual Interest</span>
-                  <span className="text-gray-800">{selectedLoan.interest}</span>
-                </div>
-              </div>
+              {/* Borrowing Details */}
+              {(() => {
+                const isAgri = !selectedLoan.crop.toLowerCase().includes('education') && 
+                               !['kirana', 'vendor', 'store', 'seller', 'milk', 'hardware', 'cloth', 'driver', 'business'].some(kw => selectedLoan.crop.toLowerCase().includes(kw));
+                return (
+                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3 text-xs font-bold text-gray-700">
+                    <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
+                      <span className="text-gray-400">{isAgri ? "Crop Cultivation" : "Loan Category"}</span>
+                      <span className="text-gray-800 flex items-center gap-1">
+                        <span>{getLoanIcon(selectedLoan.crop)}</span>
+                        <span>{selectedLoan.crop}</span>
+                      </span>
+                    </div>
+                    {isAgri && (
+                      <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
+                        <span className="text-gray-400">Land Area</span>
+                        <span className="text-gray-800">{selectedLoan.land}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
+                      <span className="text-gray-400">District</span>
+                      <span className="text-gray-800">{selectedLoan.district}</span>
+                    </div>
+                    {isAgri && (
+                      <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
+                        <span className="text-gray-400">SHG Affiliation</span>
+                        <span className="text-gray-800 truncate max-w-[120px]">{selectedLoan.shg}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-b border-gray-100/50 pb-1.5">
+                      <span className="text-gray-400">{t_str("Principal Amount")}</span>
+                      <span className="text-green-600">₹{selectedLoan.amount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">{t_str("Annual Interest")}</span>
+                      <span className="text-gray-800">{selectedLoan.interest}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* KYC Document Placeholders */}
               <div className="space-y-2.5">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">KYC Verifications</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t_str("KYC Verifications")}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 flex flex-col items-center text-center gap-1.5">
                     <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5" />
                     </svg>
-                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Aadhaar Card</span>
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">{t_str("Aadhaar Card")}</span>
                   </div>
                   <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 flex flex-col items-center text-center gap-1.5">
                     <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -384,7 +413,7 @@ export const LoansPage = () => {
                     : 'bg-red-50 border-red-100 text-red-800'
                 }`}>
                   <p className="font-extrabold uppercase text-[10px] tracking-wider mb-1">
-                    {selectedLoan.status === 'Approved' ? 'Cooperative Approved' : 'Risk Rejected'}
+                    {selectedLoan.status === 'Approved' ? t_str("Cooperative Approved") : t_str("Risk Rejected")}
                   </p>
                   <p className="font-medium text-[11px] opacity-80 leading-relaxed">
                     {selectedLoan.status === 'Approved'

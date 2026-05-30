@@ -166,6 +166,16 @@ def test_backend_auth():
     # Name should be updated if it was previously empty or we want to overwrite it
     db.close()
     print("   [OK] Account linking successfully matched by phone and saved firebase_uid.")
+    
+    # 11. Test GET /api/auth/trust-score
+    print("11. Testing GET /api/auth/trust-score...")
+    resp = client.get(f"/api/auth/trust-score?user_id={user_data['id']}")
+    assert resp.status_code == 200
+    trust_data = resp.json()
+    assert trust_data["trust_score"] == 35
+    assert trust_data["trust_tier"] == "Community Trusted"
+    assert "peer_vouches" in trust_data["components"]
+    print("   [OK] Trust score fetched successfully.")
 
     print("\n--- ALL TESTS COMPLETED SUCCESSFULLY ---")
 

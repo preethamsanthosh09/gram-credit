@@ -3,12 +3,16 @@ import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
 import api from '../api/axios';
 import { useAuthStore } from '../store/useAuthStore';
+import { TRANSLATIONS, getTranslator } from '../utils/translations';
 
 export const ROSCAPage = () => {
-  const { user } = useAuthStore();
+  const { user, language: lang = 'EN' } = useAuthStore();
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.EN;
+  const t_str = getTranslator(lang);
   const [activeTab, setActiveTab] = useState('MyGroup');
 
-  // Interactive My Group states
+  // Interactive {t_str("My Group")} states
+  const [groupId, setGroupId] = useState(null);
   const [highestBid, setHighestBid] = useState(9200);
   const [bidsCount, setBidsCount] = useState(3);
   const [myBid, setMyBid] = useState(9000);
@@ -19,6 +23,17 @@ export const ROSCAPage = () => {
   const [hasPaidCurrent, setHasPaidCurrent] = useState(true); // Month 3 paid
   const [isPaying, setIsPaying] = useState(false);
 
+  // Dynamic Group Meta states
+  const [groupName, setGroupName] = useState("Mandya Farmers Circle");
+  const [inviteCode, setInviteCode] = useState("GC-CHIT-9018");
+  const [membersCountState, setMembersCountState] = useState(10);
+  const [monthlyContribution, setMonthlyContribution] = useState(1000);
+  const [poolSize, setPoolSize] = useState(10000);
+  const [durationMonths, setDurationMonths] = useState(10);
+  const [currentMonth, setCurrentMonth] = useState(3);
+  const [winnersList, setWinnersList] = useState([]);
+  const [userGroups, setUserGroups] = useState([]);
+
   // Tab 2 creation states
   const [newGroupName, setNewGroupName] = useState('');
   const [membersCount, setMembersCount] = useState(10);
@@ -26,14 +41,41 @@ export const ROSCAPage = () => {
   const [isCreating, setIsCreating] = useState(false);
 
   // Fetch rotating savings details from FastAPI
-  const fetchGroupDetails = async () => {
+  const fetchUserGroups = async () => {
     if (!user?.id) return;
     try {
-      const res = await api.get(`/api/rosca/my-groups?user_id=${user.id}`);
+      const res = await api.get(`/api/rosca/user-groups?user_id=${user.id}`);
+      setUserGroups(res.data);
+    } catch (err) {
+      console.error("FastAPI failed listing user groups:", err);
+    }
+  };
+
+  const fetchGroupDetails = async (targetGroupId) => {
+    if (!user?.id) return;
+    try {
+      const activeId = targetGroupId || groupId;
+      // If a specific group ID is provided, retrieve its metrics; otherwise let backend resolve default
+      const url = activeId
+        ? `/api/rosca/my-groups?user_id=${user.id}&group_id=${activeId}`
+        : `/api/rosca/my-groups?user_id=${user.id}`;
+        
+      const res = await api.get(url);
+      setGroupId(res.data.id);
       setHighestBid(res.data.current_auction.current_bid);
       setBidsCount(res.data.current_auction.bids_placed);
       setTotalPaid(res.data.paid_months * res.data.monthly_contribution);
       setHasPaidCurrent(res.data.paid_months >= res.data.current_month);
+      
+      // Update dynamic states
+      setGroupName(res.data.name);
+      setInviteCode(res.data.invite_code || "GC-CHIT-9018");
+      setMembersCountState(res.data.members);
+      setMonthlyContribution(res.data.monthly_contribution);
+      setPoolSize(res.data.pool_size);
+      setDurationMonths(res.data.duration_months);
+      setCurrentMonth(res.data.current_month);
+      setWinnersList(res.data.winners || []);
     } catch (err) {
       console.error("FastAPI ROSCA circle details failed, showing fallbacks:", err);
     }
@@ -41,6 +83,7 @@ export const ROSCAPage = () => {
 
   useEffect(() => {
     fetchGroupDetails();
+    fetchUserGroups();
   }, [user]);
 
   const handleBidSubmit = async (e) => {
@@ -58,7 +101,7 @@ export const ROSCAPage = () => {
 
     try {
       await api.post('/api/rosca/bid', {
-        group_id: 1,
+        group_id: groupId,
         user_id: user?.id || 1,
         amount: bidVal
       });
@@ -79,7 +122,7 @@ export const ROSCAPage = () => {
 
     try {
       await api.post('/api/rosca/pay-contribution', {
-        group_id: 1,
+        group_id: groupId,
         user_id: user?.id || 1,
         month: 3
       });
@@ -87,6 +130,7 @@ export const ROSCAPage = () => {
       setTotalPaid(prev => prev + 1000);
       setHasPaidCurrent(true);
       toast.success("₹1,000 Contribution Paid Successfully!", { id: "payment-toast" });
+      fetchGroupDetails();
     } catch (err) {
       console.error(err);
       setIsPaying(false);
@@ -112,7 +156,8 @@ export const ROSCAPage = () => {
       toast.success(`${newGroupName} created! Invitation code is ${res.data.invite_code}. Invites sent via SMS.`);
       setNewGroupName('');
       setActiveTab('MyGroup');
-      fetchGroupDetails();
+      fetchGroupDetails(res.data.id);
+      fetchUserGroups();
     } catch (err) {
       console.error(err);
       toast.error("Cooperative group creation failed on server.");
@@ -132,34 +177,54 @@ export const ROSCAPage = () => {
         {/* Page Header */}
         <header className="max-w-4xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-black text-gray-900">ROSCA / Chit Fund Circles</h1>
+            <h1 className="text-2xl font-black text-gray-900">{t.rosca.title}</h1>
             <p className="text-xs text-gray-500 mt-0.5">Participate in rotating community savings pools, place auction bids, and secure instant capital.</p>
           </div>
 
-          {/* Tab Selection Row */}
-          <div className="bg-white border border-gray-150 p-1 rounded-xl flex gap-1 shadow-sm text-xs font-bold">
-            <button
-              onClick={() => setActiveTab('MyGroup')}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'MyGroup'
-                  ? 'bg-green-600 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              My Group
-            </button>
-            <button
-              onClick={() => setActiveTab('CreateGroup')}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'CreateGroup'
-                  ? 'bg-green-600 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              Create Group
+          {/* Selector Dropdown & Tab Selection Row */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            {/* Swifter Dropdown */}
+            {userGroups.length > 1 && (
+              <div className="flex items-center gap-2 bg-white border border-gray-150 p-1.5 rounded-xl shadow-sm">
+                <span className="text-[10px] uppercase font-bold text-gray-400 pl-1.5">{t_str("Switch Circle:")}</span>
+                <select
+                  value={groupId || ''}
+                  onChange={(e) => fetchGroupDetails(Number(e.target.value))}
+                  className="px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100/70 border-0 rounded-lg text-xs font-extrabold text-gray-700 focus:outline-none cursor-pointer transition-all"
+                >
+                  {userGroups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="bg-white border border-gray-150 p-1 rounded-xl flex gap-1 shadow-sm text-xs font-bold">
+              <button
+                onClick={() => setActiveTab('MyGroup')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  activeTab === 'MyGroup'
+                    ? 'bg-green-600 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                {t_str("My Group")}
+              </button>
+              <button
+                onClick={() => setActiveTab('CreateGroup')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  activeTab === 'CreateGroup'
+                    ? 'bg-green-600 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+              {t_str("Create Group")}
             </button>
           </div>
-        </header>
+        </div>
+      </header>
 
         {/* Dynamic Views */}
         <div className="max-w-4xl mx-auto">
@@ -175,32 +240,32 @@ export const ROSCAPage = () => {
                 <div className="absolute top-0 left-0 w-2 h-full bg-green-500"></div>
                 <div>
                   <span className="inline-flex px-2 py-0.5 rounded bg-green-100 text-green-800 text-[9px] font-black uppercase tracking-wider mb-2">
-                    Active Chit Circle
+                    {t_str("Active Chit Circle")}
                   </span>
-                  <h2 className="text-xl font-black text-gray-800">Mandya Farmers Circle</h2>
-                  <p className="text-xs text-gray-400 font-semibold mt-1">Cooperative Chit ID: GC-CHIT-9018</p>
+                  <h2 className="text-xl font-black text-gray-800">{groupName}</h2>
+                  <p className="text-xs text-gray-400 font-semibold mt-1">{t_str("Cooperative Chit ID:")} {inviteCode}</p>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 text-xs font-bold text-gray-500">
                   <div className="border-l border-gray-100 pl-4">
-                    <p className="text-[10px] text-gray-400 uppercase font-semibold">Members</p>
-                    <p className="text-gray-800 text-sm font-black mt-0.5">10 Farmers</p>
+                    <p className="text-[10px] text-gray-400 uppercase font-semibold">{t_str("Members")}</p>
+                    <p className="text-gray-800 text-sm font-black mt-0.5">{membersCountState} {t_str("Farmers")}</p>
                   </div>
                   <div className="border-l border-gray-100 pl-4">
-                    <p className="text-[10px] text-gray-400 uppercase font-semibold">Monthly Contribution</p>
-                    <p className="text-gray-800 text-sm font-black mt-0.5">₹1,000</p>
+                    <p className="text-[10px] text-gray-400 uppercase font-semibold">{t_str("Monthly Contribution")}</p>
+                    <p className="text-gray-800 text-sm font-black mt-0.5">₹{monthlyContribution.toLocaleString()}</p>
                   </div>
                   <div className="border-l border-gray-100 pl-4">
-                    <p className="text-[10px] text-gray-400 uppercase font-semibold">Pool Size</p>
-                    <p className="text-green-600 text-sm font-black mt-0.5">₹10,000</p>
+                    <p className="text-[10px] text-gray-400 uppercase font-semibold">{t_str("Pool Size")}</p>
+                    <p className="text-green-600 text-sm font-black mt-0.5">₹{poolSize.toLocaleString()}</p>
                   </div>
                   <div className="border-l border-gray-100 pl-4">
                     <p className="text-[10px] text-gray-400 uppercase font-semibold">Tenure</p>
-                    <p className="text-gray-800 text-sm font-black mt-0.5">Month 3 of 10</p>
+                    <p className="text-gray-800 text-sm font-black mt-0.5">Month {currentMonth} of {durationMonths}</p>
                   </div>
                 </div>
               </div>
 
-              {/* 10-Step Horizontal Timeline */}
+              {/* Dynamic Horizontal Timeline */}
               <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-8">Rotating Pool Timeline</h3>
                 
@@ -208,12 +273,17 @@ export const ROSCAPage = () => {
                   {/* Connecting Line background */}
                   <div className="absolute left-6 right-6 h-1 bg-gray-200 z-0"></div>
                   {/* Sowing progress highlight */}
-                  <div className="absolute left-6 w-[22%] h-1 bg-green-500 z-0"></div>
+                  <div 
+                    className="absolute left-6 h-1 bg-green-500 z-0 transition-all duration-500"
+                    style={{ width: `${durationMonths > 1 ? ((currentMonth - 1) / (durationMonths - 1)) * 92 : 0}%` }}
+                  ></div>
 
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((m) => {
-                    const isWinner = m <= 2;
-                    const isActive = m === 3;
-                    const isFuture = m > 3;
+                  {Array.from({ length: durationMonths || 10 }, (_, i) => i + 1).map((m) => {
+                    const isWinner = m < currentMonth;
+                    const isActive = m === currentMonth;
+                    const isFuture = m > currentMonth;
+                    
+                    const monthWinner = winnersList.find(w => w.month === m);
 
                     return (
                       <div key={m} className="relative z-10 flex flex-col items-center group cursor-pointer">
@@ -225,7 +295,7 @@ export const ROSCAPage = () => {
                         )}
                         {isActive && (
                           <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-black text-xs border-2 border-white ring-4 ring-amber-100 animate-pulse">
-                            3
+                            {m}
                           </div>
                         )}
                         {isFuture && (
@@ -239,15 +309,15 @@ export const ROSCAPage = () => {
                         {/* Tooltip on Winner Hover */}
                         {isWinner && (
                           <div className="absolute bottom-11 scale-0 group-hover:scale-100 transition-transform duration-200 bg-gray-900 text-white text-[10px] font-bold py-1.5 px-3 rounded-lg shadow-xl w-32 text-center pointer-events-none z-30">
-                            {m === 1 ? (
+                            {monthWinner ? (
                               <>
-                                <p className="font-extrabold text-green-400">Ravi Kumar</p>
-                                <p className="opacity-80">Won ₹9,500</p>
+                                <p className="font-extrabold text-green-400">{monthWinner.name}</p>
+                                <p className="opacity-80">Won ₹{monthWinner.amount_won.toLocaleString()}</p>
                               </>
                             ) : (
                               <>
-                                <p className="font-extrabold text-green-400">Lakshmi Devi</p>
-                                <p className="opacity-80">Won ₹9,100</p>
+                                <p className="font-extrabold text-green-400">Cooperative Pool</p>
+                                <p className="opacity-85">Resolved</p>
                               </>
                             )}
                             <div className="w-2.5 h-2.5 bg-gray-900 rotate-45 mx-auto -mb-2.5 mt-1"></div>
@@ -266,16 +336,16 @@ export const ROSCAPage = () => {
                 </div>
               </div>
 
-              {/* Auction Card (Month 3) & Bidding Interface */}
+              {/* Auction Card (Month {currentMonth}) & Bidding Interface */}
               <div className="bg-white border-2 border-amber-400 rounded-3xl p-6 shadow-sm space-y-5 relative">
                 <div className="absolute top-0 left-0 w-2 h-full bg-amber-400"></div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <span className="inline-flex px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider mb-2 animate-pulse">
-                      ⚡ Month 3 Auction Live
+                      ⚡ Month {currentMonth} Auction Live
                     </span>
                     <h3 className="text-base font-black text-gray-800">Current Pool Auction in Progress</h3>
-                    <p className="text-xs text-gray-400 font-semibold mt-1">Bids are open to all 10 members. Dynamic discount returns to farmers.</p>
+                    <p className="text-xs text-gray-400 font-semibold mt-1">Bids are open to all {membersCountState} members. Dynamic discount returns to farmers.</p>
                   </div>
                   <span className="inline-flex px-3.5 py-1.5 rounded-full text-xs font-black bg-amber-50 border border-amber-200 text-amber-700">
                     2 days remaining
@@ -286,12 +356,12 @@ export const ROSCAPage = () => {
                   <div className="text-center sm:text-left">
                     <p className="text-[10px] text-gray-400 uppercase font-semibold">Current Highest Bid</p>
                     <p className="text-2xl font-black text-amber-600 mt-1">₹{highestBid.toLocaleString()}</p>
-                    <p className="text-[9px] text-gray-400 font-medium mt-0.5">Discount: ₹{Number(10000 - highestBid).toLocaleString()}</p>
+                    <p className="text-[9px] text-gray-400 font-medium mt-0.5">Discount: ₹{Number(poolSize - highestBid).toLocaleString()}</p>
                   </div>
                   <div className="border-t sm:border-t-0 sm:border-l border-gray-100 pt-4 sm:pt-0 sm:pl-6 text-center sm:text-left">
                     <p className="text-[10px] text-gray-400 uppercase font-semibold">Participation</p>
-                    <p className="text-xl font-black text-gray-800 mt-1">{bidsCount} of 10 Members</p>
-                    <p className="text-[9px] text-gray-400 font-medium mt-0.5">Active bids placed</p>
+                    <p className="text-xl font-black text-gray-800 mt-1">{bidsCount} of {membersCountState} Members</p>
+                    <p className="text-[9px] text-gray-400 font-medium mt-0.5">{t_str("Active bids placed")}</p>
                   </div>
                   <div className="border-t sm:border-t-0 sm:border-l border-gray-100 pt-4 sm:pt-0 sm:pl-6 text-center sm:text-left flex items-center justify-center sm:justify-start">
                     {!isBiddingOpen && !hasBidded ? (
@@ -354,39 +424,29 @@ export const ROSCAPage = () => {
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Past Winners Ledger</h3>
                 
                 <div className="divide-y divide-gray-50 text-xs font-bold text-gray-700">
-                  {/* Winner 1 */}
-                  <div className="flex justify-between items-center py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-green-50 text-green-700 flex items-center justify-center font-black text-xs">
-                        R
-                      </div>
-                      <div>
-                        <p className="text-gray-800">Ravi Kumar</p>
-                        <p className="text-[10px] text-gray-400 font-medium">Month 1 Champion</p>
-                      </div>
+                  {winnersList.length === 0 ? (
+                    <div className="py-4 text-center text-xs font-semibold text-gray-400">
+                      No past auctions held yet.
                     </div>
-                    <div className="text-right">
-                      <p className="text-green-600">Won ₹9,500</p>
-                      <p className="text-[9px] text-gray-400 font-medium">Discount dividend: ₹500 (Returned to pool)</p>
-                    </div>
-                  </div>
-
-                  {/* Winner 2 */}
-                  <div className="flex justify-between items-center py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-green-50 text-green-700 flex items-center justify-center font-black text-xs">
-                        L
+                  ) : (
+                    winnersList.map((w, idx) => (
+                      <div key={idx} className="flex justify-between items-center py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-green-50 text-green-700 flex items-center justify-center font-black text-xs">
+                            {w.name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-gray-800">{w.name}</p>
+                            <p className="text-[10px] text-gray-400 font-medium">Month {w.month} Champion</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-green-600">Won ₹{w.amount_won.toLocaleString()}</p>
+                          <p className="text-[9px] text-gray-400 font-medium">Discount dividend: ₹{(poolSize - w.amount_won).toLocaleString()} (Returned to pool)</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-gray-800">Lakshmi Devi</p>
-                        <p className="text-[10px] text-gray-400 font-medium">Month 2 Champion</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-green-600">Won ₹9,100</p>
-                      <p className="text-[9px] text-gray-400 font-medium">Discount dividend: ₹900 (Returned to pool)</p>
-                    </div>
-                  </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -395,9 +455,9 @@ export const ROSCAPage = () => {
                 <div className="space-y-1">
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">My Contribution Ledger</p>
                   <p className="text-sm font-black text-gray-800">
-                    Total Paid: <span className="text-green-600">₹{totalPaid.toLocaleString()}</span> (3 × ₹1,000)
+                    Total Paid: <span className="text-green-600">₹{totalPaid.toLocaleString()}</span> ({monthlyContribution > 0 ? totalPaid / monthlyContribution : 0} × ₹{monthlyContribution.toLocaleString()})
                   </p>
-                  <p className="text-[10px] text-gray-400 font-semibold">Next Payment Due: June 1, 2026</p>
+                  <p className="text-[10px] text-gray-400 font-semibold">Next Payment Due: {inviteCode === "GC-CHIT-9018" ? "June 1, 2026" : "Dynamic schedule active"}</p>
                 </div>
 
                 {!hasPaidCurrent ? (
@@ -406,11 +466,11 @@ export const ROSCAPage = () => {
                     disabled={isPaying}
                     className="w-full sm:w-auto px-6 py-3.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-green-600/10 transition-all flex items-center justify-center gap-2 active:scale-95"
                   >
-                    {isPaying ? "Connecting UPI..." : "Pay Now (₹1,000)"}
+                    {isPaying ? "Connecting UPI..." : `Pay Now (₹${monthlyContribution.toLocaleString()})`}
                   </button>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    ✓ Month 3 Paid
+                    ✓ Month {currentMonth} Paid
                   </span>
                 )}
               </div>
@@ -467,10 +527,10 @@ export const ROSCAPage = () => {
                     </div>
                   </div>
 
-                  {/* Monthly Contribution Slider */}
+                  {/* {t_str("Monthly Contribution")} Slider */}
                   <div className="space-y-3 bg-gray-50/50 p-4 border border-gray-100 rounded-2xl">
                     <div className="flex justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      <span>Monthly Contribution</span>
+                      <span>{t_str("Monthly Contribution")}</span>
                       <span className="text-green-600 font-black text-sm">₹{contributionFee.toLocaleString()}</span>
                     </div>
                     <input

@@ -19,17 +19,34 @@ def calculate_score(
     elif docs_count >= 3:
         docs_score = 30
 
-    # 2. Crop Score (max 20)
+    # 2. Crop/Category Score (max 20)
     # Paddy: 20, Sugarcane: 20, Cotton: 18, Wheat: 16, Maize: 14
+    # Education/Business: 18-20 baseline
     crop_scores = {
         "paddy": 20,
         "sugarcane": 20,
         "cotton": 18,
         "wheat": 16,
-        "maize": 14
+        "maize": 14,
+        "education": 20,
+        "kirana store": 20,
+        "vegetable seller": 18,
+        "milk vendor": 18,
+        "hardware shop": 20,
+        "cloth merchant": 20,
+        "auto driver": 18,
+        "business": 20
     }
     crop_normalized = str(crop).strip().lower() if crop else ""
-    crop_score = crop_scores.get(crop_normalized, 0)
+    crop_score = 0
+    if crop_normalized in crop_scores:
+        crop_score = crop_scores[crop_normalized]
+    else:
+        # Match keywords for complex mapped values (e.g. "Education: Primary School")
+        for key, val in crop_scores.items():
+            if key in crop_normalized:
+                crop_score = val
+                break
 
     # 3. Land Score (max 25)
     # min(land_acres * 8, 25)
@@ -38,6 +55,15 @@ def calculate_score(
 
     # 4. SHG Membership (max 20)
     shg_score = 20 if shg_member else 0
+
+    # 4b. Adjust baseline scores for non-agricultural loans so they are not penalized for 0 land / 0 SHG
+    is_non_agri = any(kw in crop_normalized for kw in [
+        "education", "kirana store", "vegetable seller", "milk vendor", 
+        "hardware shop", "cloth merchant", "auto driver", "business"
+    ])
+    if is_non_agri:
+        land_score = max(land_score, 20.0)
+        shg_score = max(shg_score, 15.0)
 
     # 5. Repayment History Bonus (max 15)
     # repayment_history * 5 (capped at 15)

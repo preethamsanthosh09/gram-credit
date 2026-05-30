@@ -75,7 +75,7 @@ class PayResponse(BaseModel):
 # --- Routes ---
 
 @router.get("/my-groups", response_model=GroupDetailsResponse)
-def get_my_groups(user_id: int, db: Session = Depends(get_db)):
+def get_my_groups(user_id: int, group_id: Optional[int] = None, db: Session = Depends(get_db)):
     # Ensure user exists in SQLite to prevent autoincrement ID collisions
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -91,7 +91,13 @@ def get_my_groups(user_id: int, db: Session = Depends(get_db)):
 
 
     # Find if user has a registered group
-    member_rel = db.query(ChitMember).filter(ChitMember.user_id == user_id).first()
+    if group_id is not None:
+        member_rel = db.query(ChitMember).filter(
+            ChitMember.user_id == user_id,
+            ChitMember.group_id == group_id
+        ).first()
+    else:
+        member_rel = db.query(ChitMember).filter(ChitMember.user_id == user_id).first()
     
     if not member_rel:
         # Auto-seed a beautiful premium active group for this user if SQLite is blank
@@ -155,6 +161,12 @@ def get_my_groups(user_id: int, db: Session = Depends(get_db)):
         db.refresh(group)
         member_rel = db.query(ChitMember).filter(ChitMember.user_id == user_id).first()
     
+    if not member_rel:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No registered chit circle membership found for this user."
+        )
+        
     group = db.query(ChitGroup).filter(ChitGroup.id == member_rel.group_id).first()
     
     # Query winners list
@@ -288,6 +300,36 @@ def pay_contribution(request: PayRequest, db: Session = Depends(get_db)):
     
     # Increment paid months persistently in SQLite
     member.paid_months = min(member.paid_months + 1, group.duration_months)
+    
+    # If the user has paid for the current active month, close the auction and advance the month!
+    if member.paid_months >= group.current_month:
+        # Determine the winner based on lowest bid (standard for reverse auctions)
+        lowest_bid = db.query(ChitBid).filter(
+            ChitBid.group_id == group.id,
+            ChitBid.month == group.current_month
+        ).order_by(ChitBid.amount.asc()).first()
+        
+        amount_won = lowest_bid.amount if lowest_bid else (group.pool_size - 1000.0)
+        winner_user_id = lowest_bid.user_id if lowest_bid else request.user_id
+        
+        # Seed winner row if none exists
+        existing_winner = db.query(ChitWinner).filter(
+            ChitWinner.group_id == group.id,
+            ChitWinner.month == group.current_month
+        ).first()
+        
+        if not existing_winner:
+            db_winner = ChitWinner(
+                group_id=group.id,
+                user_id=winner_user_id,
+                month=group.current_month,
+                amount_won=amount_won
+            )
+            db.add(db_winner)
+            
+        # Advance the active circle month
+        group.current_month = min(group.current_month + 1, group.duration_months)
+        
     db.commit()
     db.refresh(member)
     
@@ -296,3 +338,23 @@ def pay_contribution(request: PayRequest, db: Session = Depends(get_db)):
         "paid": group.monthly_contribution,
         "total_paid": member.paid_months * group.monthly_contribution
     }
+
+class GroupSummary(BaseModel):
+    id: int
+    name: str
+    status: str
+
+@router.get("/user-groups", response_model=List[GroupSummary])
+def get_user_groups(user_id: int, db: Session = Depends(get_db)):
+    memberships = db.query(ChitMember).filter(ChitMember.user_id == user_id).all()
+    groups_list = []
+    for m in memberships:
+        g = db.query(ChitGroup).filter(ChitGroup.id == m.group_id).first()
+        if g:
+            groups_list.append({
+                "id": g.id,
+                "name": g.name,
+                "status": g.status
+            })
+    return groups_list
+

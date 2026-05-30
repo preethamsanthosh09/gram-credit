@@ -12,8 +12,13 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
+import { useAuthStore } from '../store/useAuthStore';
+import { getTranslator } from '../utils/translations';
+
 export const HarvestCalendar = ({ crop = "Paddy", amount = 50000 }) => {
-  // Normalize crop input to match keys
+  const { language: lang = 'EN' } = useAuthStore();
+  const t_str = getTranslator(lang);
+  // Normalize crop input to match keys (English keys are used in CROP_SEASONS object)
   const normalizedCrop = crop.charAt(0).toUpperCase() + crop.slice(1).toLowerCase();
   const season = CROP_SEASONS[normalizedCrop] || CROP_SEASONS.Paddy;
 
@@ -31,10 +36,10 @@ export const HarvestCalendar = ({ crop = "Paddy", amount = 50000 }) => {
           <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          Harvest Repayment Calendar ({normalizedCrop})
+          {t_str("Harvest Repayment Calendar")} ({t_str(normalizedCrop)})
         </h4>
         <span className="text-[10px] font-black text-green-700 bg-green-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
-          Harvest-Aligned
+          {t_str("Harvest-Aligned")}
         </span>
       </div>
 
@@ -50,16 +55,16 @@ export const HarvestCalendar = ({ crop = "Paddy", amount = 50000 }) => {
 
           if (isSowing) {
             cardStyle = "bg-gray-100 border-gray-200/50 text-gray-400";
-            label = "Sowing";
-            amountDisplay = "No EMI";
+            label = t_str("Sowing");
+            amountDisplay = t_str("No EMI");
           } else if (isHarvest) {
             cardStyle = "bg-green-600 border-green-600 text-white shadow-md shadow-green-600/10";
-            label = "Harvest";
+            label = t_str("Harvest");
             amountDisplay = `₹${emiAmount.toLocaleString()}`;
           } else {
             cardStyle = "bg-white border-gray-200 text-gray-500 hover:bg-gray-50/50";
-            label = "Off-season";
-            amountDisplay = "No EMI";
+            label = t_str("Off-season");
+            amountDisplay = t_str("No EMI");
           }
 
           return (
@@ -80,11 +85,11 @@ export const HarvestCalendar = ({ crop = "Paddy", amount = 50000 }) => {
       {/* Summary Box */}
       <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-600 space-y-2">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
-          <span>Total EMI Months: <strong className="text-gray-800 text-sm font-black">{totalEMIMonths}</strong></span>
+          <span>{t_str("Total EMI Months")}: <strong className="text-gray-800 text-sm font-black">{totalEMIMonths}</strong></span>
           <span className="hidden sm:inline text-gray-300">|</span>
-          <span>Total Payable: <strong className="text-green-600 text-sm font-black">₹{amount.toLocaleString()}</strong></span>
+          <span>{t_str("Total Payable")}: <strong className="text-green-600 text-sm font-black">₹{amount.toLocaleString()}</strong></span>
           <span className="hidden sm:inline text-gray-300">|</span>
-          <span>Interest: <strong className="text-gray-800 text-sm font-black">12% p.a.</strong></span>
+          <span>{t_str("Interest")}: <strong className="text-gray-800 text-sm font-black">12% p.a.</strong></span>
         </div>
       </div>
 
@@ -92,8 +97,8 @@ export const HarvestCalendar = ({ crop = "Paddy", amount = 50000 }) => {
       <div className="bg-green-50/50 border border-green-100 rounded-xl p-3.5 flex items-start gap-2.5">
         <span className="text-base">💡</span>
         <p className="text-[11px] font-bold text-green-800 leading-normal">
-          <strong className="font-extrabold block mb-0.5">AI Recommendation</strong>
-          Best repayment timing based on Mandya district rainfall data (IMD) and historical {normalizedCrop.toLowerCase()} yield.
+          <strong className="font-extrabold block mb-0.5">{t_str("AI Recommendation")}</strong>
+          {t_str("Best repayment timing based on Mandya district rainfall data (IMD) and historical")} {t_str(normalizedCrop).toLowerCase()} {lang === "EN" ? "yield." : ""}
         </p>
       </div>
     </div>

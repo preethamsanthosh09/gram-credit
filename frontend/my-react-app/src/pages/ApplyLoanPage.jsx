@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getTranslator } from '../utils/translations';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
 import api from '../api/axios';
 import HarvestCalendar from '../components/HarvestCalendar';
 import { useAuthStore } from '../store/useAuthStore';
+import { TRANSLATIONS } from '../utils/translations';
 
 // ─── Static Data ────────────────────────────────────────────────────────────
 
@@ -13,8 +15,6 @@ const loanCategories = [
   { id: 'education',   label: '🎓 Education',   desc: 'School & college fees' },
   { id: 'vendor',      label: '🏪 Business',     desc: 'Daily stock, micro-loans' },
 ];
-
-const crops = ['Paddy', 'Wheat', 'Sugarcane', 'Cotton', 'Maize'];
 
 const educationLevels = [
   { level: 'Primary School',       fee: '₹5,000–₹15,000/year' },
@@ -27,7 +27,17 @@ const educationLevels = [
 
 export const ApplyLoanPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, language: lang = 'EN' } = useAuthStore();
+  const t_str = getTranslator(lang);
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.EN;
+  const crops = [t_str("Paddy"), t_str("Wheat"), t_str("Sugarcane"), t_str("Cotton"), t_str("Maize")];
+  const [applicantName, setApplicantName] = useState('');
+
+  useEffect(() => {
+    if (user?.name) {
+      setApplicantName(user.name);
+    }
+  }, [user]);
 
   // ── Wizard ──
   const [step, setStep] = useState(1);
@@ -36,7 +46,7 @@ export const ApplyLoanPage = () => {
   const [loanCategory, setLoanCategory] = useState('agriculture');
 
   // ── Agriculture Step 1 ──
-  const [cropType,   setCropType]   = useState('Paddy');
+  const [cropType,   setCropType]   = useState(t_str("Paddy"));
   const [landArea,   setLandArea]   = useState('');
   const [shgMember,  setShgMember]  = useState(false);
   const [loanAmount, setLoanAmount] = useState(50000);
@@ -120,24 +130,26 @@ export const ApplyLoanPage = () => {
         shg_member: shgMember,
         amount: Number(loanAmount),
         repayment_mode: repaymentMode,
-        district: user?.district || 'Mandya'
+        district: user?.district || 'Mandya',
+        farmer_name: applicantName
       };
-    } else {
+    } else if (loanCategory === 'education') {
       payload = {
-        loanCategory,
-        eduLevel,
-        childName,
-        schoolName,
-        eduAmount: Number(eduAmount),
-        scholarship
+        user_id: user?.id || 1,
+        crop_type: `Education: ${eduLevel} (${childName})`,
+        land_acres: 0.0,
+        shg_member: false,
+        amount: Number(eduAmount),
+        repayment_mode: 'monthly',
+        district: user?.district || 'Mandya',
+        farmer_name: applicantName
       };
     }
 
     try {
-      if (loanCategory === 'agriculture') {
+      if (loanCategory === 'agriculture' || loanCategory === 'education') {
         await api.post('/api/loans/apply', payload);
       } else {
-        // Fast mock timeout for education loan due to agriculture-only SQL schema
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       toast.success('Application submitted!', { id: 'submit' });
@@ -176,8 +188,8 @@ export const ApplyLoanPage = () => {
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-black text-gray-900">Apply for Loan</h1>
-            <p className="text-xs text-gray-500 mt-0.5">GramCredit — rural credit made simple.</p>
+            <h1 className="text-2xl font-black text-gray-900">{t.loans.applyNewLoan}</h1>
+            <p className="text-xs text-gray-500 mt-0.5">GramCredit — rural credit made simple for {user?.name || "Farmer"}.</p>
           </div>
         </header>
 
@@ -208,7 +220,7 @@ export const ApplyLoanPage = () => {
 
               {/* Category Selector */}
               <div className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm">
-                <h2 className="text-xl font-black text-gray-900 mb-1">Loan Category</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-1">{t.loans.title}</h2>
                 <p className="text-sm text-gray-500 mb-5">Select the type of loan you need.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {loanCategories.map((cat) => (
@@ -233,14 +245,27 @@ export const ApplyLoanPage = () => {
               {loanCategory === 'agriculture' && (
                 <div className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
                   <div>
-                    <h2 className="text-xl font-black text-gray-900">Crop & Land Details</h2>
+                    <h2 className="text-xl font-black text-gray-900">{t.profile.landDetails}</h2>
                     <p className="text-sm text-gray-500 mt-1">We calculate your credit limit based on crop type, land, and SHG membership.</p>
                   </div>
 
                   <form onSubmit={handleCheckEligibility} className="space-y-5">
+                    {/* Applicant Name */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">{t_str("Applicant Name")}</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Ravi Kumar"
+                        value={applicantName}
+                        onChange={(e) => setApplicantName(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold focus:outline-none focus:border-green-500 focus:bg-white text-gray-800 text-sm transition-all"
+                        required
+                      />
+                    </div>
+
                     {/* Crop chips */}
                     <div>
-                      <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-2">Crop Type</label>
+                      <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-2">{t_str("Crop Type")}</label>
                       <div className="flex flex-wrap gap-2">
                         {crops.map((c) => (
                           <button
@@ -262,7 +287,7 @@ export const ApplyLoanPage = () => {
                     {/* Land + Amount */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Land Area (Acres)</label>
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">{t_str("Land Area (Acres)")}</label>
                         <input
                           type="number"
                           min="0.1"
@@ -313,7 +338,7 @@ export const ApplyLoanPage = () => {
                     {scorecard && (
                       <div className={`p-5 rounded-2xl border-2 ${scorecard.approved ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">GramCredit Score</p>
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t_str("GramCredit Score")}</p>
                           <span className={`text-2xl font-black ${scorecard.approved ? 'text-green-600' : 'text-red-500'}`}>
                             {scorecard.score}
                           </span>
@@ -321,11 +346,11 @@ export const ApplyLoanPage = () => {
                         {scorecard.approved ? (
                           <div className="space-y-1 text-xs font-bold">
                             <div className="flex justify-between">
-                              <span className="text-gray-500">Max Credit Limit</span>
+                              <span className="text-gray-500">{t_str("Max Credit Limit")}</span>
                               <span className="text-green-700">₹{scorecard.maxAmount.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-500">Interest Rate</span>
+                              <span className="text-gray-500">{t_str("Interest Rate")}</span>
                               <span className="text-green-700">{scorecard.interestRate} p.a.</span>
                             </div>
                             <p className="text-green-700 mt-2">✅ Pre-approved! Proceed to repayment structure.</p>
@@ -362,13 +387,26 @@ export const ApplyLoanPage = () => {
               {loanCategory === 'education' && (
                 <div className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
                   <div>
-                    <h2 className="text-xl font-black text-gray-900">Education Loan Details</h2>
+                    <h2 className="text-xl font-black text-gray-900">{t_str("Education Loan Details")}</h2>
                     <p className="text-sm text-gray-500 mt-1">Get fee financing at 8% p.a. — repay in 5 years.</p>
+                  </div>
+
+                  {/* Applicant Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">{t_str("Applicant Name")}</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Ravi Kumar"
+                      value={applicantName}
+                      onChange={(e) => setApplicantName(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold focus:outline-none focus:border-green-500 focus:bg-white text-gray-800 text-sm transition-all"
+                      required
+                    />
                   </div>
 
                   {/* Education level cards */}
                   <div>
-                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-3">Education Level</label>
+                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-3">{t_str("Education Level")}</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {educationLevels.map((el) => (
                         <div
@@ -390,7 +428,7 @@ export const ApplyLoanPage = () => {
                   {/* Child name + School */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Student Name</label>
+                      <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">{t_str("Student Name")}</label>
                       <input
                         type="text"
                         placeholder="e.g. Priya Devi"
@@ -400,7 +438,7 @@ export const ApplyLoanPage = () => {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">School / College Name</label>
+                      <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">{t_str("School / College Name")}</label>
                       <input
                         type="text"
                         placeholder="e.g. Govt. High School, Mandya"
@@ -438,7 +476,7 @@ export const ApplyLoanPage = () => {
                     }`}
                   >
                     <div>
-                      <p className="text-sm font-extrabold text-gray-800">Government Scholarship</p>
+                      <p className="text-sm font-extrabold text-gray-800">{t_str("Government Scholarship")}</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">Rate reduced to 6% p.a. if eligible</p>
                     </div>
                     <div className={`w-12 h-6 rounded-full flex items-center px-1 transition-all ${scholarship ? 'bg-green-500' : 'bg-gray-300'}`}>
@@ -450,13 +488,13 @@ export const ApplyLoanPage = () => {
                   <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-2 text-xs font-bold">
                     <p className="text-amber-800 font-extrabold text-sm">📋 Loan Estimate</p>
                     <div className="flex justify-between text-gray-600">
-                      <span>Interest Rate</span><span className="text-green-700">{eduInterestRate} p.a.</span>
+                      <span>{t_str("Interest Rate")}</span><span className="text-green-700">{eduInterestRate} p.a.</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                       <span>Tenure</span><span>5 years (60 months)</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
-                      <span>Est. Monthly EMI</span>
+                      <span>{t_str("Est. Monthly EMI")}</span>
                       <span className="text-green-700">₹{eduMonthly.toLocaleString()}/month</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
@@ -507,7 +545,7 @@ export const ApplyLoanPage = () => {
               {loanCategory === 'agriculture' && (
                 <div className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
                   <div>
-                    <h2 className="text-xl font-black text-gray-900">Repayment Mode</h2>
+                    <h2 className="text-xl font-black text-gray-900">{t.loans.repaymentMode}</h2>
                     <p className="text-sm text-gray-500 mt-1">Choose a repayment structure that suits your harvest timeline.</p>
                   </div>
 
@@ -574,20 +612,21 @@ export const ApplyLoanPage = () => {
               {loanCategory === 'education' && (
                 <div className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
                   <div>
-                    <h2 className="text-xl font-black text-gray-900">Review Education Loan</h2>
+                    <h2 className="text-xl font-black text-gray-900">{t_str("Review Education Loan")}</h2>
                     <p className="text-sm text-gray-500 mt-1">Confirm all details before submitting.</p>
                   </div>
 
                   <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 space-y-3 text-xs font-bold">
                     {[
+                      ['Applicant',         user?.name || 'Farmer'],
                       ['Loan Type',         '🎓 Education Loan'],
-                      ['Student Name',       childName || '—'],
+                      [t_str("Student Name"),       childName || '—'],
                       ['School / College',   schoolName || '—'],
-                      ['Education Level',    eduLevel || '—'],
+                      [t_str("Education Level"),    eduLevel || '—'],
                       ['Fee Amount',         `₹${Number(eduAmount).toLocaleString()}`],
-                      ['Interest Rate',      `${eduInterestRate} p.a.`],
-                      ['Repayment Tenure',   '5 years (60 months)'],
-                      ['Est. Monthly EMI',   `₹${eduMonthly.toLocaleString()}`],
+                      [t_str("Interest Rate"),      `${eduInterestRate} p.a.`],
+                      [t_str("Repayment Tenure"),   '5 years (60 months)'],
+                      [t_str("Est. Monthly EMI"),   `₹${eduMonthly.toLocaleString()}`],
                       ['Scholarship',        scholarship ? '✅ Yes' : '❌ No'],
                     ].map(([label, value]) => (
                       <div key={label} className="flex justify-between border-b border-gray-100 pb-2 last:border-0">
@@ -626,20 +665,21 @@ export const ApplyLoanPage = () => {
           {step === 3 && loanCategory === 'agriculture' && (
             <div className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
               <div>
-                <h2 className="text-xl font-black text-gray-900">Review & Submit</h2>
-                <p className="text-sm text-gray-500 mt-1">Confirm your crop credit application before final submission.</p>
+                <h2 className="text-xl font-black text-gray-900">{t.kyc.submitBtn}</h2>
+                <p className="text-sm text-gray-500 mt-1">{t_str("Confirm your crop credit application before final submission.")}</p>
               </div>
 
               <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 space-y-3 text-xs font-bold">
                 {[
+                  ['Applicant',        user?.name || 'Farmer'],
                   ['Loan Type',        '🌾 Agriculture / Crop Loan'],
                   ['Crop',             cropType],
                   ['Land Area',        `${landArea} Acres`],
                   ['SHG Member',       shgMember ? '✅ Yes' : '❌ No'],
-                  ['Loan Amount',      `₹${Number(loanAmount).toLocaleString()}`],
-                  ['Credit Score',     scorecard?.score || '—'],
-                  ['Interest Rate',    scorecard?.interestRate || '—'],
-                  ['Repayment Mode',   repaymentMode === 'harvest' ? 'Harvest-Aligned' : repaymentMode === 'monthly' ? 'Monthly EMI' : 'Yearly Bullet'],
+                  [t_str("Loan Amount"),      `₹${Number(loanAmount).toLocaleString()}`],
+                  [t_str("Credit Score"),     scorecard?.score || '—'],
+                  [t_str("Interest Rate"),    scorecard?.interestRate || '—'],
+                  [t_str("Repayment Mode"),   repaymentMode === 'harvest' ? t_str("Harvest-Aligned") : repaymentMode === 'monthly' ? 'Monthly EMI' : 'Yearly Bullet'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between border-b border-gray-100 pb-2 last:border-0">
                     <span className="text-gray-400">{label}</span>
@@ -683,8 +723,8 @@ export const ApplyLoanPage = () => {
             <div className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
               <div className="text-center py-4">
                 <div className="text-5xl mb-4">🎓</div>
-                <h2 className="text-xl font-black text-gray-900 mb-2">Submitting Education Loan</h2>
-                <p className="text-sm text-gray-500 mb-6">Your application for <strong>{childName}</strong> at <strong>{schoolName || 'the institution'}</strong> is ready.</p>
+                <h2 className="text-xl font-black text-gray-900 mb-2">{t_str("Submitting Education Loan")}</h2>
+                <p className="text-sm text-gray-500 mb-6">Your application under applicant <strong>{user?.name || 'Farmer'}</strong> for <strong>{childName}</strong> at <strong>{schoolName || 'the institution'}</strong> is ready.</p>
                 <button
                   onClick={handleSubmitApplication}
                   disabled={isSubmitting}

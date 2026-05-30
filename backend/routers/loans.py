@@ -55,6 +55,7 @@ class LoanApplyRequest(BaseModel):
     amount: float
     repayment_mode: str  # "monthly" | "harvest" | "yearly"
     district: str
+    farmer_name: Optional[str] = None
 
 class RepaymentResponse(BaseModel):
     id: int
@@ -76,6 +77,7 @@ class LoanApplyResponse(BaseModel):
 class LoanDetailResponse(BaseModel):
     id: int
     user_id: int
+    farmer_name: Optional[str] = "Farmer"
     crop_type: str
     land_acres: float
     shg_member: bool
@@ -107,6 +109,7 @@ class LoanListResponse(BaseModel):
     status: str
     created_at: datetime
     approved_at: Optional[datetime] = None
+    repayments: Optional[List[RepaymentResponse]] = []
 
     class Config:
         from_attributes = True
@@ -156,6 +159,12 @@ def check_loan_eligibility(request: EligibilityRequest, db: Session = Depends(ge
 
 @router.post("/apply", response_model=LoanApplyResponse)
 def apply_for_loan(request: LoanApplyRequest, db: Session = Depends(get_db)):
+    if request.farmer_name:
+        user = db.query(User).filter(User.id == request.user_id).first()
+        if user:
+            user.name = request.farmer_name
+            db.commit()
+
     if request.repayment_mode not in ["monthly", "harvest", "yearly"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -331,23 +340,11 @@ def list_loans(
     district: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    # Perform a joined query to pull farmer's name
-    query = db.query(
-        Loan.id,
-        Loan.user_id,
-        User.name.label("farmer_name"),
-        Loan.crop_type,
-        Loan.land_acres,
-        Loan.shg_member,
-        Loan.amount,
-        Loan.repayment_mode,
-        Loan.district,
-        Loan.score,
-        Loan.tier,
-        Loan.status,
-        Loan.created_at,
-        Loan.approved_at
-    ).join(User, Loan.user_id == User.id)
+    # Perform a joined query to pull farmer's name and repayments relationship
+    query = db.query(Loan).options(
+        joinedload(Loan.user),
+        joinedload(Loan.repayments)
+    )
     
     # Apply dynamic filters
     if status is not None:
@@ -359,18 +356,67 @@ def list_loans(
     if district is not None:
         query = query.filter(Loan.district == district)
         
-    results = query.all()
+    loans = query.all()
     
     # Return formatted rows matching the List schema
+    results = [
+        {
+            "id": loan.id,
+            "user_id": loan.user_id,
+            "farmer_name": loan.user.name if loan.user else "Farmer",
+            "crop_type": loan.crop_type,
+            "land_acres": loan.land_acres,
+            "shg_member": loan.shg_member,
+            "amount": loan.amount,
+            "repayment_mode": loan.repayment_mode,
+            "district": loan.district,
+            "score": loan.score,
+            "tier": loan.tier,
+            "status": loan.status,
+            "created_at": loan.created_at,
+            "approved_at": loan.approved_at,
+            "repayments": [
+                {
+                    "id": rep.id,
+                    "month_number": rep.month_number,
+                    "amount": rep.amount,
+                    "status": rep.status,
+                    "due_date": rep.due_date
+                }
+                for rep in loan.repayments
+            ]
+        }
+        for loan in loans
+    ]
     return results
 
 
 @router.get("/{loan_id}", response_model=LoanDetailResponse)
 def get_loan_details(loan_id: int, db: Session = Depends(get_db)):
-    loan = db.query(Loan).options(joinedload(Loan.repayments)).filter(Loan.id == loan_id).first()
+    loan = db.query(Loan).options(
+        joinedload(Loan.user),
+        joinedload(Loan.repayments)
+    ).filter(Loan.id == loan_id).first()
     if not loan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Loan with ID {loan_id} not found."
         )
-    return loan
+    
+    return {
+        "id": loan.id,
+        "user_id": loan.user_id,
+        "farmer_name": loan.user.name if loan.user else "Farmer",
+        "crop_type": loan.crop_type,
+        "land_acres": loan.land_acres,
+        "shg_member": loan.shg_member,
+        "amount": loan.amount,
+        "repayment_mode": loan.repayment_mode,
+        "district": loan.district,
+        "score": loan.score,
+        "tier": loan.tier,
+        "status": loan.status,
+        "created_at": loan.created_at,
+        "approved_at": loan.approved_at,
+        "repayments": loan.repayments
+    }

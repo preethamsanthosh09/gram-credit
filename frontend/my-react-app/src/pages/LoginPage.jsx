@@ -106,46 +106,6 @@ const LOCALIZATIONS = {
     sending: "పంపుతోంది...",
     verifying: "ధృవీకరిస్తోంది..."
   },
-  ML: {
-    tagline: "കർഷകർക്ക് ഔദ്യോഗിക വായ്പ",
-    phoneTitle: "ഗ്രാംക്രെഡിറ്റിലേക്ക് സ്വാഗതം",
-    phoneSubtitle: "സുരക്ഷിതമായ ലോഗിൻ ഒടിപി ലഭിക്കുന്നതിന് നിങ്ങളുടെ മൊബൈൽ നമ്പർ നൽകുക.",
-    phoneLabel: "മൊബൈൽ നമ്പർ",
-    phonePlaceholder: "10 അക്ക ഫോൺ നമ്പർ",
-    sendOtp: "OTP അയയ്ക്കുക",
-    otpTitle: "OTP പരിശോധിക്കുക",
-    otpSubtitle: "അയച്ച 6 അക്ക കോഡ് നൽകുക",
-    verifyOtp: "OTP പരിശോധിക്കുക",
-    changeNumber: "← നമ്പർ മാറ്റുക",
-    errorPhone: "ദയവായി സാധുവായ 10 അക്ക ഫോൺ നമ്പർ നൽകുക.",
-    errorPhoneNotFound: "ഈ നമ്പർ രജിസ്റ്റർ ചെയ്തിട്ടില്ല. ദയവായി 7975200593 നൽകുക.",
-    errorOtp: "ദയവായി 6 അക്ക OTP നൽകുക.",
-    errorOtpInvalid: "തെറ്റായ OTP. ദയവായി 090207 നൽകുക.",
-    otpSentSuccess: "OTP അയച്ചു!",
-    loginSuccess: "വിജയകരമായി ലോഗിൻ ചെയ്തു! സ്വാഗതം രവി കുമാർ.",
-    sending: "അയയ്ക്കുന്നു...",
-    verifying: "പരിശോധിക്കുന്നു..."
-  },
-  MR: {
-    tagline: "शेतकऱ्यांसाठी अधिकृत कर्ज",
-    phoneTitle: "ग्रामक्रेडिटमध्ये आपले स्वागत आहे",
-    phoneSubtitle: "सुरक्षित लॉगिन ओटीपी प्राप्त करण्यासाठी आपला मोबाईल नंबर प्रविष्ट करा.",
-    phoneLabel: "मोबाईल नंबर",
-    phonePlaceholder: "10-अंकी फोन नंबर",
-    sendOtp: "OTP पाठवा",
-    otpTitle: "OTP सत्यापित करा",
-    otpSubtitle: "पाठवलेला ६-अंकी कोड प्रविष्ट करा",
-    verifyOtp: "OTP सत्यापित करा",
-    changeNumber: "← नंबर बदला",
-    errorPhone: "कृपया वैध १०-अंकी फोन नंबर प्रविष्ट करा.",
-    errorPhoneNotFound: "हा फोन नंबर नोंदणीकृत नाही. कृपया 7975200593 वापरा.",
-    errorOtp: "कृपया ६-अंकी OTP प्रविष्ट करा.",
-    errorOtpInvalid: "अवैध OTP. कृपया 090207 वापरा.",
-    otpSentSuccess: "OTP पाठवला!",
-    loginSuccess: "यशस्वीरीत्या लॉगिन केले! स्वागत आहे रवी कुमार।",
-    sending: "पाठवत आहे...",
-    verifying: "सत्यापित करत आहे..."
-  }
 };
 
 const LANGUAGES = [
@@ -153,17 +113,14 @@ const LANGUAGES = [
   { code: 'HI', name: 'हिं' },
   { code: 'KN', name: 'ಕನ್ನ' },
   { code: 'TA', name: 'தமி' },
-  { code: 'TE', name: 'తెలు' },
-  { code: 'ML', name: 'മല' },
-  { code: 'MR', name: 'मरा' }
+  { code: 'TE', name: 'తెలు' }
 ];
 
 export const LoginPage = () => {
   const navigate = useNavigate();
-  const login = useAuthStore((state) => state.login);
+  const { login, language: lang, setLanguage: setLang } = useAuthStore();
 
   // States
-  const [lang, setLang] = useState('EN');
   const [step, setStep] = useState(1); // 1 = Phone Entry, 2 = OTP Entry
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -334,18 +291,11 @@ export const LoginPage = () => {
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center mb-6">
           <div className="mb-3 transform hover:scale-105 transition-transform duration-300">
-            {/* Custom leaf-credit shield premium vector */}
-            <svg className="w-14 h-14" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M32 4C18 12 14 26 14 40C14 48.8 20.2 56 32 60C43.8 56 50 48.8 50 40C50 26 46 12 32 4Z" fill="url(#leafGradient)" />
-              <path d="M32 12C32 12 22 24 22 38C22 46 26.5 50 32 54C37.5 50 42 46 42 38C42 24 32 12 32 12Z" fill="white" fillOpacity="0.15" />
-              <path d="M32 18V46M24 36H40M27 26H37" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-              <defs>
-                <linearGradient id="leafGradient" x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#16A34A" />
-                  <stop stopColor="#15803D" />
-                </linearGradient>
-              </defs>
-            </svg>
+            <img 
+              src="/logo.png" 
+              alt="GramCredit Logo" 
+              className="w-16 h-16 object-contain rounded-2xl shadow-md border border-green-100" 
+            />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-green-600 mb-1">
             GramCredit
