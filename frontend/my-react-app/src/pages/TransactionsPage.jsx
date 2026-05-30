@@ -158,6 +158,8 @@ function BarChart({ data }) {
 
 // ─── Add Expense Modal ────────────────────────────────────────────────────────
 function AddExpenseModal({ onClose, onAdd }) {
+  const { language: lang = 'EN' } = useAuthStore()
+  const t_str = getTranslator(lang)
   const [cat, setCat] = useState('')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
@@ -270,6 +272,8 @@ function AddExpenseModal({ onClose, onAdd }) {
 
 // ─── Transaction Detail Panel ─────────────────────────────────────────────────
 function DetailPanel({ txn, onClose, onDelete }) {
+  const { language: lang = 'EN' } = useAuthStore()
+  const t_str = getTranslator(lang)
   const colorMap = { green: '#16a34a', red: '#ef4444', amber: '#f59e0b', blue: '#3b82f6', purple: '#8b5cf6' }
   const bgMap = { green: '#dcfce7', red: '#fee2e2', amber: '#fef3c7', blue: '#dbeafe', purple: '#ede9fe' }
   return (
@@ -321,6 +325,8 @@ function DetailPanel({ txn, onClose, onDelete }) {
 
 // ─── Expense Tracker Tab ──────────────────────────────────────────────────────
 function ExpenseTracker({ transactions, trendData, onAddExpense }) {
+  const { language: lang = 'EN' } = useAuthStore()
+  const t_str = getTranslator(lang)
   const [budgets, setBudgets] = useState(
     Object.fromEntries(Object.entries(CAT_META).map(([k, v]) => [k, v.budget]))
   )
@@ -610,6 +616,8 @@ function QRCode({ value, size = 160 }) {
 
 // ─── UPI Pay Tab ─────────────────────────────────────────────────────────────
 function UPIPayTab({ onPaymentDone }) {
+  const { language: lang = 'EN' } = useAuthStore()
+  const t_str = getTranslator(lang)
   const [screen, setScreen]   = useState('home')   // home | send | pin | success | myqr | request
   const [step, setStep]       = useState(1)         // 1=upiid, 2=amount
   const [upiInput, setUpiInput] = useState('')
