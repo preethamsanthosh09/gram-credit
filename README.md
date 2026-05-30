@@ -476,9 +476,6 @@ build/
 .vscode/
 .idea/
 
-# Firebase
-firebase-adminsdk*.json
-
 # OS
 .DS_Store
 Thumbs.db
@@ -487,38 +484,3 @@ Thumbs.db
 *.log
 Create CONTRIBUTING.md
 markdown# Contributing to GramCredit
-
-## Team Branches
-- main       → production ready
-- dev        → active development
-- feat/auth  → Member 1
-- feat/ui    → Member 2
-- feat/ai    → Member 3
-
-## Commit Convention
-feat: add new feature
-fix: bug fix
-docs: documentation
-style: formatting
-refactor: code refactor
-
-## Example
-git commit -m "feat: add harvest repayment scheduler"
-
-⚡ Quick GitHub Setup Commands
-bash# Initialize and push
-git init
-git add .
-git commit -m "feat: initial GramCredit platform"
-git branch -M main
-git remote add origin https://github.com/YOUR/gramcredit
-git push -u origin main
-
-# Create dev branch
-git checkout -b dev
-git push origin dev
-
-# Each member creates their branch
-git checkout -b feat/backend
-git checkout -b feat/frontend
-git checkout -b feat/ai
